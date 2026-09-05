@@ -177,11 +177,24 @@ if (requireAuth()) {
       if (!rm.courses || rm.courses.length === 0) {
         area.innerHTML = '<p class="text-sm text-slate-400">No roadmap available for your department yet.</p>';
       } else {
+        // real thumbnail per course (from its first lecture video)
+        const THUMBS = {
+          "rs-fundamentals": "r7v7HFLO6FY",
+          "gis-essentials": "H0Ks-Tdac98",
+          "python-geospatial": "rfscVS0vtbw",
+          "satcom-gnss": "BUjaEYfmNFM",
+          "geo-governance": "bNesUTaZLN8",
+        };
         area.innerHTML = `<p class="text-xs text-slate-400 mb-3">Built from your assessment gaps — courses from ${[...new Set(rm.courses.map(c => c.provider))].join(", ")}. All content plays right here.</p>` +
           rm.courses.map((c, i) => `
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4 hover:shadow-md transition-shadow">
             <div class="flex items-stretch">
               <div class="w-2 bg-gradient-to-b from-blue-600 to-sky-400"></div>
+              <div class="w-44 shrink-0 hidden sm:block">
+                <img src="https://i.ytimg.com/vi/${THUMBS[c.key] || ''}/hqdefault.jpg" alt="${c.name}"
+                     class="w-full h-full object-cover" loading="lazy"
+                     onerror="this.style.display='none'"/>
+              </div>
               <div class="p-5 flex-1">
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-bold px-2 py-0.5 rounded-full ${c.badge === 'ISRO' ? 'bg-orange-100 text-orange-700' : c.badge === 'NPTEL' ? 'bg-blue-100 text-blue-700' : c.badge === 'Domain' ? 'bg-emerald-100 text-emerald-700' : 'bg-violet-100 text-violet-700'}">${c.badge}</span>
@@ -208,17 +221,41 @@ if (requireAuth()) {
       : '<p class="text-sm text-slate-400">Nothing in progress — enrol from your personalized roadmap above.</p>';
 
     // popular catalogue
+    const COURSE_ART = {
+      "do_11440794872692736001": { e: "🧹", g: "from-sky-500 to-blue-700" },
+      "do_11440794872692736002": { e: "⚖️", g: "from-amber-500 to-orange-700" },
+      "do_11440794872692736003": { e: "📋", g: "from-emerald-500 to-green-700" },
+      "do_11440794872692736004": { e: "🇮🇳", g: "from-orange-500 to-red-600" },
+      "do_11440794872692736005": { e: "🔐", g: "from-indigo-500 to-violet-700" },
+      "do_11440794872692736006": { e: "🌏", g: "from-rose-500 to-red-600" },
+      "do_11440794872692736007": { e: "💡", g: "from-teal-500 to-emerald-700" },
+      "do_11440794872692736008": { e: "🎯", g: "from-blue-600 to-indigo-800" },
+      "do_11440794872692736009": { e: "🤝", g: "from-slate-600 to-slate-900" },
+      "do_11440794872692736010": { e: "🚒", g: "from-red-500 to-orange-600" },
+      "do_11440794872692736011": { e: "🪖", g: "from-green-600 to-teal-800" },
+      "do_11440794872692736012": { e: "📊", g: "from-cyan-500 to-sky-700" },
+      "do_11440794872692736013": { e: "🤖", g: "from-violet-500 to-purple-800" },
+      "do_11440794872692736014": { e: "📈", g: "from-green-600 to-teal-800" },
+    };
     const cat = await api("/api/v1/content/search", { method: "POST", body: {} });
     const enrolledIds = new Set(d.enrollments.map(e => e.course_id));
-    document.getElementById("catalogueArea").innerHTML = cat.result.content.slice(0, 8).map(c => `
-      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
-        <div class="h-20 bg-gradient-to-br ${c.level === 'Advanced' ? 'from-indigo-500 to-violet-700' : c.level === 'Intermediate' ? 'from-sky-500 to-blue-700' : 'from-emerald-500 to-teal-700'}"></div>
+    document.getElementById("catalogueArea").innerHTML = cat.result.content.slice(0, 8).map(c => {
+      const art = COURSE_ART[c.identifier] || { e: "📘", g: "from-sky-500 to-blue-700" };
+      return `
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
+        <div class="relative h-24 bg-gradient-to-br ${art.g}">
+          <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(circle at 20% 30%, white 2px, transparent 2.5px), radial-gradient(circle at 70% 60%, white 2px, transparent 2.5px); background-size: 34px 34px, 46px 46px;"></div>
+          <span class="absolute inset-0 flex items-center justify-center text-5xl drop-shadow">${art.e}</span>
+          <span class="absolute bottom-2 left-2 text-[10px] font-bold text-white bg-black/30 rounded-full px-2 py-0.5">${c.level}</span>
+          <span class="absolute bottom-2 right-2 text-[10px] font-semibold text-white bg-black/30 rounded-full px-2 py-0.5">🕐 ${c.duration >= 3600 ? Math.round(c.duration/360)/10 + 'h' : Math.round(c.duration/60) + 'm'}</span>
+        </div>
         <div class="p-3 flex flex-col flex-1">
           <p class="text-sm font-semibold text-blue-800 leading-snug">${c.name}</p>
           <p class="text-xs text-slate-400 mt-1 flex-1">${c.organisation}</p>
           <a href="learn.html?course=${c.identifier}" class="mt-2 text-center text-sm py-1.5 rounded-full ${enrolledIds.has(c.identifier) ? 'bg-slate-100 text-slate-500' : 'border border-blue-200 text-blue-800 hover:bg-blue-50'}">${enrolledIds.has(c.identifier) ? 'Continue' : 'Preview'}</a>
         </div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
   }
 
   async function enrollFromRoadmap(courseId, already) {
