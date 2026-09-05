@@ -101,5 +101,5 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"clearCache": "do_not_clear"}')
           echo "Render responded: $HTTP"; cat /tmp/render_resp.txt || true
-          test "$HTTP" = "202" -o "$HTTP" = "200" || { echo "✗ Render deploy trigger failed"; exit 1; }
+          case "$HTTP" in 200|201|202) echo "✓ Render deploy triggered ($HTTP)";; *) echo "✗ Render deploy trigger failed"; exit 1;; esac
           echo "✓ Render deploy triggered"
