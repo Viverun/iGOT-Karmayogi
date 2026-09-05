@@ -74,6 +74,22 @@ if (requireAuth()) {
   const courseKey = new URLSearchParams(location.search).get("course");
   const LS_KEY = "lesson_done_" + (getUser()?.email || "anon") + "_" + courseKey;
   let currentCourse = null, currentQuiz = null, currentModuleNo = null, playingLesson = null;
+  // prefetch lesson quizzes in the background the moment a lesson is opened
+  const quizPrefetch = {};   // "moduleNo:videoNo" -> Promise
+  function prefetchLessonQuiz(moduleNo, videoNo) {
+    const key = moduleNo + ":" + videoNo;
+    if (quizPrefetch[key]) return quizPrefetch[key];
+    quizPrefetch[key] = api(`/api/roadmap/${courseKey}/lesson/${moduleNo}/${videoNo}/quiz`, { method: "POST" })
+      .catch(e => { delete quizPrefetch[key]; throw e; });
+    // show "ready" state on the lesson's quiz button once prepared
+    quizPrefetch[key].then(() => {
+      const row = document.querySelector(`[data-done="${moduleNo - 1}:${videoNo - 1}"]`);
+      const btn = row ? row.closest("div.flex.items-stretch")?.querySelector(".lq-btn") : null;
+      if (btn && btn.textContent.trim() === "Quiz") btn.textContent = "Quiz ✓";
+    }).catch(() => {});
+    return quizPrefetch[key];
+  }
+  window.prefetchLessonQuiz = prefetchLessonQuiz;
 
   function doneSet() { return new Set(JSON.parse(localStorage.getItem(LS_KEY) || "[]")); }
   function saveDone(set) { localStorage.setItem(LS_KEY, JSON.stringify([...set])); }
@@ -93,6 +109,7 @@ if (requireAuth()) {
     document.getElementById("nowTitle").textContent = title;
     document.querySelectorAll(".video-row").forEach(r => r.classList.remove("active"));
     playingLesson = { mi, vi, id: lessonId(mi, vi) };
+    prefetchLessonQuiz(mi + 1, vi + 1);   // start generating while the user watches
     const btn = document.getElementById("markBtn");
     btn.disabled = doneSet().has(playingLesson.id);
     btn.textContent = doneSet().has(playingLesson.id) ? "✓ Completed" : "✓ Mark lesson complete";
@@ -242,6 +259,15 @@ if (requireAuth()) {
 
   let lessonQuizState = null;
   async function startLessonQuiz(moduleNo, videoNo, btn) {
+    if (btn) { btn.textContent = "Preparing…"; btn.disabled = true; }
+    try {
+      await startLessonQuizInner(moduleNo, videoNo);
+    } catch (e) { alert(e.message); }
+    if (btn) { btn.textContent = "Quiz ✓"; btn.disabled = false; }
+  }
+  window.startLessonQuiz = startLessonQuiz;
+
+  async function startLessonQuizInner(moduleNo, videoNo) {
     lessonQuizState = { moduleNo, videoNo };
     const modal = document.getElementById("quizModal");
     document.getElementById("quizTitle").textContent = "Preparing lesson quiz…";
@@ -251,7 +277,7 @@ if (requireAuth()) {
     document.getElementById("quizResult").classList.add("hidden");
     document.getElementById("quizError").classList.add("hidden");
     modal.classList.remove("hidden");
-    currentQuiz = await api(`/api/roadmap/${courseKey}/lesson/${moduleNo}/${videoNo}/quiz`, { method: "POST" });
+    currentQuiz = await prefetchLessonQuiz(moduleNo, videoNo);
     document.getElementById("quizTitle").textContent = `Lesson Quiz: ${currentQuiz.lesson_title}`;
     document.getElementById("quizMeta").textContent = "5 questions on this lesson · retaking keeps the same questions";
     document.getElementById("quizBody").innerHTML = currentQuiz.questions.map((q, qi) => `
@@ -268,8 +294,6 @@ if (requireAuth()) {
       </div>`).join("");
     document.getElementById("quizControls").classList.remove("hidden");
   }
-  window.startLessonQuiz = startLessonQuiz;
-
   async function submitLessonQuiz() {
     const answers = currentQuiz.questions.map(q => {
       const sel = document.querySelector(`input[name="q_${q.id}"]:checked`);
