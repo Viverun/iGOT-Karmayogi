@@ -29,6 +29,7 @@
           <span id="readinessPct" class="text-2xl font-extrabold text-blue-800">–</span>
           <span class="text-[10px] text-slate-400">readiness</span>
         </div>
+        <p id="readinessCapNote" class="mt-3 text-[11px] leading-snug text-slate-400"></p>
       </div>
       <div>
         <h1 id="profileName" class="text-2xl font-bold text-[#1a3a6b]">Loading…</h1>
@@ -131,8 +132,14 @@ if (requireAuth()) {
     if (!d.assessment_done) showWelcomeOnce();
     document.getElementById("profileName").textContent = p.name;
     document.getElementById("profileRole").textContent = [p.designation, p.department].filter(Boolean).join(", ") || "Karmayogi";
-    document.getElementById("readinessPct").textContent = d.readiness_pct + "%";
-    document.getElementById("readinessRing").style.strokeDashoffset = 264 * (1 - d.readiness_pct / 100);
+    document.getElementById("readinessPct").textContent = Math.min(100, d.readiness_pct) + "%";
+    document.getElementById("readinessRing").style.strokeDashoffset = 264 * (1 - Math.min(100, d.readiness_pct) / 100);
+    const capNote = document.getElementById("readinessCapNote");
+    if (capNote) {
+      capNote.textContent = d.verified_completions === 0
+        ? "Assessments alone show up to 30% — complete roadmap courses (quiz scores ≥ 60) to raise readiness."
+        : `Verified course completions: ${d.verified_completions} · readiness cap ${d.readiness_cap}%`;
+    }
     document.getElementById("statHours").textContent = d.learning_hours;
     document.getElementById("statCourses").textContent = d.enrollments.filter(e => e.status === "completed").length + "/" + d.enrollments.length;
     document.getElementById("statGaps").textContent = d.top_gaps.length;

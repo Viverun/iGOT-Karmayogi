@@ -70,9 +70,38 @@ def competency_vector(user_id: int, department_key: str) -> list:
     } for a in areas]
 
 
+def _verified_course_completions(user_id: int) -> int:
+    """Courses completed with a solid quiz record (avg quiz score >= 60).
+    Merely finishing videos isn't enough — the quizzes back it up."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT course_id, AVG(quiz_score) AS avg_score FROM chapter_progress "
+        "WHERE user_id=? GROUP BY course_id", (user_id,)).fetchall()
+    conn.close()
+    conn2 = get_db()
+    completed = {r["course_id"] for r in conn2.execute(
+        "SELECT course_id FROM enrollments WHERE user_id=? AND status='completed'", (user_id,)).fetchall()}
+    conn2.close()
+    return sum(1 for r in rows
+               if r["course_id"] in completed and r["avg_score"] is not None and r["avg_score"] >= 60)
+
+
 def compute_gaps(user_id: int, department_key: str) -> dict:
     vector = competency_vector(user_id, department_key)
     scored = [v for v in vector if v["target"] > 0]
+
+    # evidence-based readiness:
+    #  - per-area contribution is clamped at the role target (overshooting a
+    #    target in one area can't hide a gap in another)
+    #  - assessments/quizzes alone can only demonstrate up to 30% readiness;
+    #    beyond that, readiness grows only through VERIFIED course completions
+    #    (course finished + avg quiz score >= 60), +14% each, capped at 100
+    base = round(100 * sum(min(v["current"], v["target"]) for v in scored)
+                 / max(1, sum(v["target"] for v in scored)))
+    verified = _verified_course_completions(user_id)
+    cap = min(100, 30 + 14 * verified)
+    readiness = min(base, cap)
+
     overall_current = round(sum(v["current"] for v in scored) / max(1, len(scored)), 1)
     overall_target = round(sum(v["target"] for v in scored) / max(1, len(scored)), 1)
     gaps = sorted(scored, key=lambda v: v["gap"], reverse=True)
@@ -86,7 +115,9 @@ def compute_gaps(user_id: int, department_key: str) -> dict:
         "vector": vector,
         "overall_current": overall_current,
         "overall_target": overall_target,
-        "readiness_pct": round(100 * overall_current / max(1, overall_target)),
+        "readiness_pct": readiness,
+        "readiness_cap": cap,
+        "verified_completions": verified,
         "top_gaps": worst[:5],
         "explanations": explanations,
     }

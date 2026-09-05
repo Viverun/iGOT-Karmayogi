@@ -624,6 +624,8 @@ def dashboard(authorization: Optional[str] = Header(None)):
         "overall_current": gaps["overall_current"],
         "overall_target": gaps["overall_target"],
         "readiness_pct": gaps["readiness_pct"],
+        "readiness_cap": gaps["readiness_cap"],
+        "verified_completions": gaps["verified_completions"],
         "top_gaps": gaps["top_gaps"],
         "explanations": gaps["explanations"],
         "roadmap": json.loads(roadmap_row["data_json"]) if roadmap_row else None,
