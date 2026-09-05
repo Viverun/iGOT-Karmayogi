@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -6,20 +6,27 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: cicd-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # ---------- CI: test & verify ----------
   backend:
+    name: CI · Backend (FastAPI)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
-      - name: Import check (catches route/model errors)
+      - name: Import check (catches route/model definition errors)
         working-directory: backend
         run: python -c "import main; print('routes:', len(main.app.routes))"
-      - name: Smoke test API
+      - name: Smoke test API (boots uvicorn, hits live endpoints)
         working-directory: backend
         run: |
           python -m uvicorn main:app --port 8001 &
@@ -30,13 +37,14 @@ jobs:
           CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8001/api/v1/content/search \
             -H 'Content-Type: application/json' -d '{}')
           test "$CODE" = "200"
-          echo "backend smoke test passed"
+          echo "✓ backend smoke test passed"
 
   frontend:
+    name: CI · Frontend (static site)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify pages reference the deployable API resolver
+      - name: Verify deployable API wiring (no hardcoded hosts)
         working-directory: dummy-igot
         run: |
           for f in common.js index.html login.html register.html assessment.html; do
@@ -44,11 +52,52 @@ jobs:
           done
           ! grep -rn "fetch('http://localhost:8001" *.html *.js
           ! grep -rn 'const API = "http://localhost:8001"' *.html *.js
-          echo "frontend API wiring OK"
-      - name: Check all pages exist and link-check internals
+          echo "✓ API wiring OK"
+      - name: Verify all pages exist
         working-directory: dummy-igot
         run: |
           for f in index dashboard login register assessment learn quiz studio admin course_player; do
             test -f "$f.html" || { echo "FAIL: missing $f.html"; exit 1; }
           done
-          echo "all 9 pages present"
+          echo "✓ all 9 pages present"
+
+  # ---------- CD: deploy (main pushes only, after CI passes) ----------
+  deploy-frontend:
+    name: CD · Deploy frontend → Vercel
+    if: github.event_name == 'push'
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Deploy to Vercel (production)
+        working-directory: dummy-igot
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npx --yes vercel@59 deploy --prod --yes \
+            --token "$VERCEL_TOKEN" \
+            --cwd "$(pwd)"
+          echo "✓ deployed to https://igot-karmayogi.vercel.app"
+
+  deploy-backend:
+    name: CD · Deploy backend → Render
+    if: github.event_name == 'push'
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy of latest main commit
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: |
+          RESULT=$(curl -s -X POST \
+            "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache": "clear"}')
+          echo "$RESULT" | grep -q '"id"' && echo "✓ Render deploy triggered" || { echo "$RESULT"; exit 1; }
