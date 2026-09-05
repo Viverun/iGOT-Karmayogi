@@ -457,5 +457,28 @@ new Chart(document.getElementById('groupBar'), {
   lg.append('text').attr('x', 100).attr('y', 32).attr('font-size', 10).text('0.22');
 })();
 </script>
+
+<!-- Demo-guide popup (5s after landing) -->
+<div id="demoPopup" class="hidden fixed inset-0 z-[70] bg-black/50 flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center relative">
+    <button onclick="closeDemoPopup()" class="absolute top-3 right-4 text-slate-400 hover:text-slate-600 text-xl">×</button>
+    <div class="mx-auto w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center text-2xl">🧭</div>
+    <h2 class="mt-4 text-xl font-bold text-[#1a3a6b]">You're on the demo landing page</h2>
+    <p class="mt-2 text-sm text-slate-600">This is a replica of the iGOT Karmayogi portal. Click <b>Register</b> below to enter the actual solution — where the AI competency assessment, personalized roadmap and trainer studio live.</p>
+    <div class="mt-6 flex items-center justify-center gap-3">
+      <button onclick="closeDemoPopup()" class="px-6 py-2.5 rounded-full border border-slate-300 text-slate-600 font-semibold hover:bg-slate-50 text-sm">Explore on my own</button>
+      <a href="register.html" class="px-8 py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500 text-sm">Register →</a>
+    </div>
+  </div>
+</div>
+<script>
+setTimeout(function () {
+  if (!sessionStorage.getItem('demo_popup_shown')) {
+    sessionStorage.setItem('demo_popup_shown', '1');
+    document.getElementById('demoPopup').classList.remove('hidden');
+  }
+}, 5000);
+function closeDemoPopup() { document.getElementById('demoPopup').classList.add('hidden'); }
+</script>
 </body>
 </html>
