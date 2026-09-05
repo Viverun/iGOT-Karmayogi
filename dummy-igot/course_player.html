@@ -72,7 +72,7 @@
 if (requireAuth()) {
   document.getElementById("header").innerHTML = renderHeader("dashboard.html");
   const courseKey = new URLSearchParams(location.search).get("course");
-  const LS_KEY = "lesson_done_" + courseKey;
+  const LS_KEY = "lesson_done_" + (getUser()?.email || "anon") + "_" + courseKey;
   let currentCourse = null, currentQuiz = null, currentModuleNo = null, playingLesson = null;
 
   function doneSet() { return new Set(JSON.parse(localStorage.getItem(LS_KEY) || "[]")); }

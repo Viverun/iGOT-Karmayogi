@@ -131,6 +131,19 @@ def login(body: AuthBody):
     }
 
 
+@app.post("/api/auth/logout")
+def logout(authorization: Optional[str] = Header(None)):
+    """Invalidate the session token server-side."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return {"message": "No active session"}
+    token = authorization.removeprefix("Bearer ")
+    conn = get_db()
+    conn.execute("DELETE FROM tokens WHERE token = ?", (token,))
+    conn.commit()
+    conn.close()
+    return {"message": "Logged out"}
+
+
 @app.get("/api/auth/me")
 def me(authorization: Optional[str] = Header(None)):
     user_id = require_user(authorization)
@@ -898,6 +911,46 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
         except Exception as e:
             print("personalized generation failed:", e)
 
+    if not questions and llm.llm_available():
+        # transcripts unavailable (e.g. cloud egress blocked): still let the model
+        # generate from the course/module metadata so learners always get fresh quizzes
+        try:
+            from ontology import COMPETENCY_TYPE
+            allowed = ", ".join(sorted(set(c["areas"]) | set(COMPETENCY_TYPE)))
+            meta_context = (f"Course: {c['name']}. Description: {c['description']}\n"
+                            f"Module: {module['title']}. Lessons: "
+                            + "; ".join(v["title"] for v in module["videos"])
+                            + f".\nCompetency areas covered: {', '.join(c['areas'])}.")
+            raw = llm.generate(KNOWLEDGE_QUIZ_PROMPT.format(
+                n=5, areas=allowed, context=meta_context), max_tokens=6000)
+            questions = llm.parse_llm_quiz(raw)[:5]
+            for q in questions:
+                q.setdefault("level", "L2")
+            generator = "llm-knowledge"
+        except Exception as e:
+            print("knowledge-based generation failed:", e)
+
+    if not questions and llm.llm_available():
+        try:
+            from ontology import COMPETENCY_TYPE
+            if chosen:
+                course = next(cc for cc in roadmap_data.get_roadmap(key) if cc["key"] == chosen["course_key"])
+            else:
+                course = next(cc for cc in roadmap_data.get_roadmap(key))
+            focused = [a for a in weak if a in course["areas"]] or course["areas"]
+            allowed = ", ".join(sorted(set(course["areas"]) | set(COMPETENCY_TYPE)))
+            meta_context = (f"Course: {course['name']}. Description: {course['description']}\n"
+                            f"Competency areas: {', '.join(course['areas'])}.\n"
+                            f"Generate questions that assess these focus areas: {', '.join(focused)}.")
+            raw = llm.generate(KNOWLEDGE_QUIZ_PROMPT.format(
+                n=body.n, areas=allowed, context=meta_context), max_tokens=6000)
+            questions = llm.parse_llm_quiz(raw)[:body.n]
+            for q in questions:
+                q.setdefault("level", "L2")
+            generator = "llm-knowledge"
+        except Exception as e:
+            print("personalized knowledge-based generation failed:", e)
+
     if not questions:
         bank_full = {q["id"]: q for q in QUESTION_BANK[key]}
         fallback_areas = weak
@@ -1012,6 +1065,22 @@ def lesson_quiz(course_key: str, module_no: int, video_no: int,
                 generator = "llm"
         except Exception as e:
             print("lesson quiz generation failed:", e)
+
+    if not questions and llm.llm_available() and not context_ok:
+        try:
+            from ontology import COMPETENCY_TYPE
+            allowed = ", ".join(sorted(set(c["areas"]) | set(COMPETENCY_TYPE)))
+            meta_context = (f"Course: {c['name']}. Description: {c['description']}\n"
+                            f"Lesson: {video['title']} (module: {module['title']}).\n"
+                            f"Competency areas covered: {', '.join(c['areas'])}.")
+            raw = llm.generate(KNOWLEDGE_QUIZ_PROMPT.format(
+                n=5, areas=allowed, context=meta_context), max_tokens=6000)
+            questions = llm.parse_llm_quiz(raw)[:5]
+            for q in questions:
+                q.setdefault("level", "L2")
+            generator = "llm-knowledge"
+        except Exception as e:
+            print("lesson knowledge-based generation failed:", e)
 
     if not questions:
         _, bank_key = _user_department(user_id)

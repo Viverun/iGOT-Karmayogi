@@ -72,6 +72,19 @@ def generate(prompt: str, max_tokens: int = 4000) -> str:
     raise LLMUnavailable("No LLM API key configured")
 
 
+KNOWLEDGE_QUIZ_PROMPT = """You are a subject-matter examiner for India's capacity-building programmes.
+Write {n} multiple-choice questions for the course/module described below, at a mix of difficulty levels
+"L1" (easy/recall), "L2" (medium/applied) and "L3" (hard/analytical) — roughly 2 L1, 2 L2, 1 L3 for 5 questions;
+scale proportionally for other counts. For each question, set "area" to the CLOSEST match from: {areas}.
+Return STRICT JSON: a list of objects with fields:
+question, options (exactly 4 strings), correct_index (0-3), explanation, area, level.
+Only include well-established, verifiable facts in your questions. Vary the position of the correct answer.
+
+Course/module description:
+{context}
+"""
+
+
 QUIZ_PROMPT = """You are a subject-matter question-setter for India's capacity-building programmes.
 Using ONLY the context below, write {n} multiple-choice questions at Bloom's taxonomy level: {level}.
 Return STRICT JSON: a list of objects with fields:

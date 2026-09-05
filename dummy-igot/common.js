@@ -12,9 +12,20 @@ function requireAuth() {
   return true;
 }
 function logout() {
+  // invalidate the session server-side (best-effort), then wipe everything local
+  const token = localStorage.getItem("igot_token");
+  if (token) {
+    fetch(API + "/api/auth/logout", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token },
+    }).catch(() => {});
+  }
   localStorage.removeItem("igot_token");
   localStorage.removeItem("igot_user");
-  sessionStorage.removeItem("welcome_shown");
+  Object.keys(localStorage)
+    .filter(k => k.startsWith("lesson_done_"))
+    .forEach(k => localStorage.removeItem(k));
+  sessionStorage.clear();
   location.href = "index.html";
 }
 
