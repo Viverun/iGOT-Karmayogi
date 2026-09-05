@@ -177,24 +177,11 @@ if (requireAuth()) {
       if (!rm.courses || rm.courses.length === 0) {
         area.innerHTML = '<p class="text-sm text-slate-400">No roadmap available for your department yet.</p>';
       } else {
-        // real thumbnail per course (from its first lecture video)
-        const THUMBS = {
-          "rs-fundamentals": "r7v7HFLO6FY",
-          "gis-essentials": "H0Ks-Tdac98",
-          "python-geospatial": "rfscVS0vtbw",
-          "satcom-gnss": "BUjaEYfmNFM",
-          "geo-governance": "bNesUTaZLN8",
-        };
         area.innerHTML = `<p class="text-xs text-slate-400 mb-3">Built from your assessment gaps — courses from ${[...new Set(rm.courses.map(c => c.provider))].join(", ")}. All content plays right here.</p>` +
           rm.courses.map((c, i) => `
           <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4 hover:shadow-md transition-shadow">
             <div class="flex items-stretch">
               <div class="w-2 bg-gradient-to-b from-blue-600 to-sky-400"></div>
-              <div class="w-44 shrink-0 hidden sm:block">
-                <img src="https://i.ytimg.com/vi/${THUMBS[c.key] || ''}/hqdefault.jpg" alt="${c.name}"
-                     class="w-full h-full object-cover" loading="lazy"
-                     onerror="this.style.display='none'"/>
-              </div>
               <div class="p-5 flex-1">
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-bold px-2 py-0.5 rounded-full ${c.badge === 'ISRO' ? 'bg-orange-100 text-orange-700' : c.badge === 'NPTEL' ? 'bg-blue-100 text-blue-700' : c.badge === 'Domain' ? 'bg-emerald-100 text-emerald-700' : 'bg-violet-100 text-violet-700'}">${c.badge}</span>
