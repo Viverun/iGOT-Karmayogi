@@ -62,7 +62,7 @@
     <p id="quizError" class="hidden text-sm text-red-600 mt-3"></p>
     <div id="quizControls" class="mt-5 flex justify-end gap-3">
       <button onclick="closeQuiz()" class="px-5 py-2 rounded-full border border-slate-300 text-slate-600 text-sm">Cancel</button>
-      <button id="quizSubmitBtn" onclick="submitQuiz()" class="px-6 py-2 rounded-full bg-orange-400 text-white font-semibold text-sm hover:bg-orange-500">Submit</button>
+      <button id="quizSubmitBtn" onclick="submitCurrentQuiz()" class="px-6 py-2 rounded-full bg-orange-400 text-white font-semibold text-sm hover:bg-orange-500">Submit</button>
     </div>
     <div id="quizResult" class="hidden"></div>
   </div>
@@ -106,6 +106,8 @@ if (requireAuth()) {
     document.getElementById("markBtn").disabled = true;
     const tick = document.querySelector(`[data-done="${playingLesson.id}"]`);
     if (tick) tick.classList.remove("hidden");
+    const row = tick ? tick.closest("div.flex.items-stretch") : null;
+    if (row) row.querySelector(".lq-btn").disabled = false;
     refreshModuleBadges();
     // auto-advance to the next unmarked lesson in the same module
     const { mi, vi } = playingLesson;
@@ -179,12 +181,16 @@ if (requireAuth()) {
         </button>
         <div id="mb${mi}" class="module-body ${mi === 0 ? '' : 'hidden'} border-t border-slate-100">
           ${m.videos.map((v, vi) => `
-            <div class="video-row flex items-center gap-2 px-4 py-2.5 border-b border-slate-50 cursor-pointer hover:bg-blue-50"
+            <div class="flex items-stretch border-b border-slate-50">
+              <div class="video-row flex items-center gap-2 px-4 py-2.5 flex-1 cursor-pointer hover:bg-blue-50"
                  onclick="play({yt:'${v.yt}', playlist:${!!v.playlist}}, '${v.title.replace(/'/g, "\\'")}', ${mi}, ${vi})">
               <span class="text-red-600">▶</span>
               <span class="text-sm text-slate-700 flex-1">${v.title}</span>
               <span class="text-emerald-600 hidden" data-done="${lessonId(mi, vi)}">✔</span>
-              ${v.playlist ? '<span class="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">playlist</span>' : ''}
+                ${v.playlist ? '<span class="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">playlist</span>' : ''}
+              </div>
+              <button onclick="startLessonQuiz(${mi + 1}, ${vi + 1}, this)" disabled
+                class="lq-btn px-3 text-xs font-semibold text-blue-700 hover:bg-blue-50 border-l border-slate-100 disabled:text-slate-300">Quiz</button>
             </div>`).join("")}
           <div class="p-3">
             <button id="mq${mi}" onclick="startModuleQuiz(${mi + 1})" disabled
@@ -201,6 +207,7 @@ if (requireAuth()) {
   }
 
   async function startModuleQuiz(moduleNo) {
+    lessonQuizState = null;
     currentModuleNo = moduleNo;
     const modal = document.getElementById("quizModal");
     document.getElementById("quizTitle").textContent = "Loading quiz from lecture transcripts…";
@@ -213,7 +220,7 @@ if (requireAuth()) {
     currentQuiz = await api(`/api/roadmap/${courseKey}/module/${moduleNo}/quiz`, { method: "POST" });
     document.getElementById("quizTitle").textContent = `Module ${moduleNo}: ${currentQuiz.module_title}`;
     document.getElementById("quizMeta").textContent =
-      `5 questions generated ${currentQuiz.generator === "llm-transcript" ? "from the actual lecture transcripts (AI-grounded)" : "from the competency bank"} — retaking keeps the same questions`;
+      "5 questions on this module · retaking keeps the same questions";
     document.getElementById("quizBody").innerHTML = currentQuiz.questions.map((q, qi) => `
       <div>
         <p class="text-sm font-medium">${qi + 1}. ${q.question}
@@ -232,6 +239,64 @@ if (requireAuth()) {
 
   function closeQuiz() { document.getElementById("quizModal").classList.add("hidden"); }
   window.closeQuiz = closeQuiz;
+
+  let lessonQuizState = null;
+  async function startLessonQuiz(moduleNo, videoNo, btn) {
+    lessonQuizState = { moduleNo, videoNo };
+    const modal = document.getElementById("quizModal");
+    document.getElementById("quizTitle").textContent = "Preparing lesson quiz…";
+    document.getElementById("quizMeta").textContent = "";
+    document.getElementById("quizBody").innerHTML = "";
+    document.getElementById("quizControls").classList.add("hidden");
+    document.getElementById("quizResult").classList.add("hidden");
+    document.getElementById("quizError").classList.add("hidden");
+    modal.classList.remove("hidden");
+    currentQuiz = await api(`/api/roadmap/${courseKey}/lesson/${moduleNo}/${videoNo}/quiz`, { method: "POST" });
+    document.getElementById("quizTitle").textContent = `Lesson Quiz: ${currentQuiz.lesson_title}`;
+    document.getElementById("quizMeta").textContent = "5 questions on this lesson · retaking keeps the same questions";
+    document.getElementById("quizBody").innerHTML = currentQuiz.questions.map((q, qi) => `
+      <div>
+        <p class="text-sm font-medium">${qi + 1}. ${q.question}
+          <span class="text-[10px] font-bold rounded px-1.5 py-0.5 ml-1 ${q.level === 'L1' ? 'bg-green-100 text-green-700' : q.level === 'L2' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">${q.level || 'L2'}</span>
+        </p>
+        <div class="mt-2 grid gap-2">
+          ${q.options.map((o, oi) => `
+            <label class="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 text-sm cursor-pointer hover:bg-blue-50">
+              <input type="radio" name="q_${q.id}" value="${oi}" /> ${o}
+            </label>`).join("")}
+        </div>
+      </div>`).join("");
+    document.getElementById("quizControls").classList.remove("hidden");
+  }
+  window.startLessonQuiz = startLessonQuiz;
+
+  async function submitLessonQuiz() {
+    const answers = currentQuiz.questions.map(q => {
+      const sel = document.querySelector(`input[name="q_${q.id}"]:checked`);
+      return sel ? { question_id: q.id, chosen: +sel.value } : null;
+    });
+    if (answers.some(a => a === null)) {
+      const e = document.getElementById("quizError");
+      e.textContent = "Please answer all questions."; e.classList.remove("hidden"); return;
+    }
+    const r = await api(`/api/roadmap/${courseKey}/lesson/${lessonQuizState.moduleNo}/${lessonQuizState.videoNo}/complete`,
+      { method: "POST", body: { answers } });
+    document.getElementById("quizControls").classList.add("hidden");
+    const res = document.getElementById("quizResult");
+    res.classList.remove("hidden");
+    res.innerHTML = `
+      <div class="border-t border-slate-100 pt-4 text-center">
+        <p class="text-4xl font-extrabold ${r.lesson_score >= 70 ? 'text-emerald-600' : r.lesson_score >= 40 ? 'text-amber-600' : 'text-red-600'}">${r.lesson_score}%</p>
+        <p class="text-sm text-slate-500 mt-1">Lesson quiz — saved to your learning profile</p>
+        <div class="mt-3 flex justify-center gap-6 text-sm">
+          <span class="text-emerald-700">💪 Strength: <b>${r.strength}</b></span>
+          <span class="text-red-600">📌 Weakness: <b>${r.weakness}</b></span>
+        </div>
+        <p class="text-xs text-slate-400 mt-2">Role readiness ${r.readiness_pct}%</p>
+        <button onclick="closeQuiz()" class="mt-4 px-6 py-2 rounded-full bg-blue-700 text-white font-semibold text-sm">Continue learning</button>
+      </div>`;
+  }
+  window.submitLessonQuiz = submitLessonQuiz;
 
   async function submitQuiz() {
     const answers = currentQuiz.questions.map(q => {
@@ -259,6 +324,8 @@ if (requireAuth()) {
       </div>`;
   }
   window.submitQuiz = submitQuiz;
+  function submitCurrentQuiz() { return lessonQuizState ? submitLessonQuiz() : submitQuiz(); }
+  window.submitCurrentQuiz = submitCurrentQuiz;
 
   load().then(() => {
     // auto-select the first lesson so the player is never blank

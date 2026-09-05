@@ -844,6 +844,7 @@ def personalized_preview(authorization: Optional[str] = Header(None)):
 
 class PersonalizedGenerateBody(BaseModel):
     n: int = 5
+    course_key: Optional[str] = None
 
 
 @app.post("/api/personalized/generate")
@@ -860,14 +861,17 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
 
     import roadmap_data
     context, fetched, chosen = "", [], None
-    for c in roadmap_data.get_roadmap(key):
-        overlap = [a for a in c["areas"] if a in weak]
-        if not overlap:
-            continue
+    courses = roadmap_data.get_roadmap(key)
+    if body.course_key:
+        courses = [c for c in courses if c["key"] == body.course_key]
+        if not courses:
+            raise HTTPException(404, "Course not found in your roadmap")
+    for c in courses:
+        overlap = [a for a in c["areas"] if a in weak] or c["areas"]
         for mi, m in enumerate(c["modules"], start=1):
             try:
                 import transcripts as ts
-                ctx, vids = ts.module_context(m["videos"])
+                ctx, vids = ts.module_context(m["videos"], total=60000)
             except Exception:
                 ctx, vids = "", []
             if ctx:
@@ -880,9 +884,11 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
     if context and llm.llm_available():
         try:
             from ontology import COMPETENCY_TYPE
-            allowed = ", ".join(sorted(set(c["areas"]) | set(COMPETENCY_TYPE)))
+            course = next(cc for cc in roadmap_data.get_roadmap(key) if cc["key"] == chosen["course_key"])
+            focused = [a for a in weak if a in course["areas"]] or course["areas"]
+            allowed = ", ".join(sorted(set(course["areas"]) | set(COMPETENCY_TYPE)))
             prompt = MODULE_QUIZ_PROMPT.format(
-                module_title=f"{chosen['title']} (targeting weak areas: {', '.join(weak)})",
+                module_title=f"{chosen['title']} (focus: {', '.join(focused)})",
                 course_name=chosen["course_key"], n=body.n, areas=allowed, context=context)
             raw = llm.generate(prompt, max_tokens=6000)
             questions = llm.parse_llm_quiz(raw)[:body.n]
@@ -894,7 +900,11 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
 
     if not questions:
         bank_full = {q["id"]: q for q in QUESTION_BANK[key]}
-        qs = ge.pick_questions(QUESTION_BANK[key], weak, n=body.n)
+        fallback_areas = weak
+        if chosen:
+            course = next(cc for cc in roadmap_data.get_roadmap(key) if cc["key"] == chosen["course_key"])
+            fallback_areas = [a for a in weak if a in course["areas"]] or course["areas"]
+        qs = ge.pick_questions(QUESTION_BANK[key], fallback_areas, n=body.n)
         questions = [{**q, **({"answer": bank_full[q["id"]]["answer"]} if q["id"] in bank_full else {}),
                       "question": q["text"], "level": "L2"} for q in qs]
 
@@ -954,6 +964,111 @@ def personalized_grade(quiz_id: int, body: QuizSubmitBody, authorization: Option
             "strength": max(area_scores, key=area_scores.get),
             "weakness": min(area_scores, key=area_scores.get),
             "readiness_pct": gaps["readiness_pct"], "results": results}
+
+
+
+# ---------- Per-lesson quizzes (transcript-grounded, 5 questions) ----------
+
+@app.post("/api/roadmap/{course_key}/lesson/{module_no}/{video_no}/quiz")
+def lesson_quiz(course_key: str, module_no: int, video_no: int,
+                authorization: Optional[str] = Header(None)):
+    user_id = require_user(authorization)
+    import roadmap_data
+    c = roadmap_data.get_course(course_key)
+    if not c:
+        raise HTTPException(404, "Course not found in your roadmap")
+    if not 1 <= module_no <= len(c["modules"]):
+        raise HTTPException(404, "Unknown module")
+    module = c["modules"][module_no - 1]
+    if not 1 <= video_no <= len(module["videos"]):
+        raise HTTPException(404, "Unknown lesson")
+    video = module["videos"][video_no - 1]
+
+    conn = get_db()
+    stored = conn.execute(
+        "SELECT questions_json, generator FROM lesson_quizzes WHERE user_id=? AND course_key=? AND module_no=? AND video_no=?",
+        (user_id, course_key, module_no, video_no)).fetchone()
+    conn.close()
+    if stored and stored["generator"] != "fallback":
+        return {"lesson_title": video["title"], "generator": stored["generator"],
+                "questions": json.loads(stored["questions_json"])}
+
+    _, key = _user_department(user_id)
+    questions, generator, context_ok = [], "fallback", False
+    if not video.get("playlist"):
+        try:
+            import transcripts as ts
+            ctx = ts.get_transcript(video["yt"])
+            context_ok = bool(ctx)
+            if ctx and llm.llm_available():
+                from ontology import COMPETENCY_TYPE
+                allowed = ", ".join(sorted(set(c["areas"]) | set(COMPETENCY_TYPE)))
+                prompt = MODULE_QUIZ_PROMPT.format(
+                    module_title=f"{video['title']} (lesson quiz)", course_name=c["name"],
+                    n=5, areas=allowed, context=ctx)
+                questions = llm.parse_llm_quiz(llm.generate(prompt, max_tokens=6000))[:5]
+                for q in questions:
+                    q.setdefault("level", "L2")
+                generator = "llm"
+        except Exception as e:
+            print("lesson quiz generation failed:", e)
+
+    if not questions:
+        _, bank_key = _user_department(user_id)
+        qs = ge.pick_questions(QUESTION_BANK[bank_key], c["areas"], n=5)
+        bank_full = {q["id"]: q for q in QUESTION_BANK[bank_key]}
+        questions = [{**q, **({"answer": bank_full[q["id"]]["answer"]} if q["id"] in bank_full else {}),
+                      "question": q["text"], "level": "L2"} for q in qs]
+
+    conn = get_db()
+    conn.execute("INSERT INTO lesson_quizzes (user_id, course_key, module_no, video_no, video_id, questions_json, generator) VALUES (?,?,?,?,?,?,?)",
+                 (user_id, course_key, module_no, video_no, video["yt"], json.dumps(questions), generator))
+    conn.commit()
+    conn.close()
+    return {"lesson_title": video["title"], "generator": generator,
+            "questions": [{k: q[k] for k in ("id", "question", "options", "area", "level") if k in q}
+                          for q in questions]}
+
+
+@app.post("/api/roadmap/{course_key}/lesson/{module_no}/{video_no}/complete")
+def lesson_quiz_complete(course_key: str, module_no: int, video_no: int, body: ChapterCompleteBody,
+                         authorization: Optional[str] = Header(None)):
+    user_id = require_user(authorization)
+    conn = get_db()
+    row = conn.execute(
+        "SELECT questions_json FROM lesson_quizzes WHERE user_id=? AND course_key=? AND module_no=? AND video_no=?",
+        (user_id, course_key, module_no, video_no)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(400, "Take the lesson quiz first")
+    bank = {q["id"]: q for q in json.loads(row["questions_json"])}
+    per_area, correct = {}, 0
+    for a in body.answers:
+        q = bank.get(a.get("question_id"))
+        if not q:
+            continue
+        ok = a.get("chosen") == q["answer"]
+        correct += ok
+        st = per_area.setdefault(q.get("area", "General"), {"correct": 0, "total": 0})
+        st["total"] += 1
+        st["correct"] += ok
+    if not per_area:
+        raise HTTPException(400, "No valid answers submitted")
+    score = round(100 * correct / max(1, sum(v["total"] for v in per_area.values())))
+    area_scores = {area: round(100 * v["correct"] / v["total"]) for area, v in per_area.items()}
+
+    ge.update_competency(user_id, area_scores)
+    ge.log_event(user_id, "lesson_quiz_completed",
+                 {"course_key": course_key, "module_no": module_no, "video_no": video_no,
+                  "score": score, "strength": max(area_scores, key=area_scores.get),
+                  "weakness": min(area_scores, key=area_scores.get)})
+    _, key = _user_department(user_id)
+    gaps = ge.compute_gaps(user_id, key)
+    ge.build_roadmap(user_id, key, COURSES, gaps, completed_ids=_completed_ids(user_id))
+    return {"lesson_score": score, "area_scores": area_scores,
+            "strength": max(area_scores, key=area_scores.get),
+            "weakness": min(area_scores, key=area_scores.get),
+            "readiness_pct": gaps["readiness_pct"]}
 
 
 @app.get("/api/admin/analytics")

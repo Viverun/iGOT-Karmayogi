@@ -94,6 +94,17 @@ CREATE TABLE IF NOT EXISTS module_quizzes (
     generator TEXT NOT NULL,
     UNIQUE(user_id, course_key, module_no)
 );
+CREATE TABLE IF NOT EXISTS lesson_quizzes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    course_key TEXT NOT NULL,
+    module_no INTEGER NOT NULL,
+    video_no INTEGER NOT NULL,
+    video_id TEXT NOT NULL,
+    questions_json TEXT NOT NULL,
+    generator TEXT NOT NULL,
+    UNIQUE(user_id, course_key, module_no, video_no)
+);
 CREATE TABLE IF NOT EXISTS personalized_quizzes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id),
