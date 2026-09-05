@@ -26,6 +26,7 @@ from gap_engine import chapters_for
 import gap_engine as ge
 import materials as mat_engine
 import llm
+from llm import KNOWLEDGE_QUIZ_PROMPT
 
 init_db()
 COURSES = json.loads((Path(__file__).parent / "data" / "courses.json").read_text())
@@ -368,6 +369,25 @@ def roadmap_module_quiz(course_key: str, module_no: int, authorization: Optional
             generator = "llm-transcript"
         except Exception as e:
             print("LLM module quiz failed:", e)
+
+    if not questions and llm.llm_available():
+        # transcripts unavailable (e.g. cloud egress blocked): still let the model
+        # generate from the course/module metadata so learners always get fresh quizzes
+        try:
+            from ontology import COMPETENCY_TYPE
+            allowed = ", ".join(sorted(set(c["areas"]) | set(COMPETENCY_TYPE)))
+            meta_context = (f"Course: {c['name']}. Description: {c['description']}\n"
+                            f"Module: {module['title']}. Lessons: "
+                            + "; ".join(v["title"] for v in module["videos"])
+                            + f".\nCompetency areas covered: {', '.join(c['areas'])}.")
+            raw = llm.generate(KNOWLEDGE_QUIZ_PROMPT.format(
+                n=5, areas=allowed, context=meta_context), max_tokens=6000)
+            questions = llm.parse_llm_quiz(raw)[:5]
+            for q in questions:
+                q.setdefault("level", "L2")
+            generator = "llm-knowledge"
+        except Exception as e:
+            print("knowledge-based generation failed:", e)
 
     if not questions:
         # bank fallback: pick_questions strips answers for client serving, so
@@ -910,25 +930,6 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
             generator = "llm-transcript"
         except Exception as e:
             print("personalized generation failed:", e)
-
-    if not questions and llm.llm_available():
-        # transcripts unavailable (e.g. cloud egress blocked): still let the model
-        # generate from the course/module metadata so learners always get fresh quizzes
-        try:
-            from ontology import COMPETENCY_TYPE
-            allowed = ", ".join(sorted(set(c["areas"]) | set(COMPETENCY_TYPE)))
-            meta_context = (f"Course: {c['name']}. Description: {c['description']}\n"
-                            f"Module: {module['title']}. Lessons: "
-                            + "; ".join(v["title"] for v in module["videos"])
-                            + f".\nCompetency areas covered: {', '.join(c['areas'])}.")
-            raw = llm.generate(KNOWLEDGE_QUIZ_PROMPT.format(
-                n=5, areas=allowed, context=meta_context), max_tokens=6000)
-            questions = llm.parse_llm_quiz(raw)[:5]
-            for q in questions:
-                q.setdefault("level", "L2")
-            generator = "llm-knowledge"
-        except Exception as e:
-            print("knowledge-based generation failed:", e)
 
     if not questions and llm.llm_available():
         try:
