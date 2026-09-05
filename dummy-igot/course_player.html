@@ -102,6 +102,11 @@ if (requireAuth()) {
   }
 
   function play(v, title, mi, vi) {
+    const flatIdx = flatLessons().findIndex(f => f.mi === mi && f.vi === vi);
+    if (!lessonUnlocked(flatIdx)) {
+      alert("🔒 Pass the previous lesson's quiz (score 60+) to unlock this lesson.");
+      return;
+    }
     document.getElementById("player").src = ytSrc(v);
     document.getElementById("player").classList.remove("hidden");
     const ph = document.getElementById("playerPlaceholder");
@@ -146,6 +151,23 @@ if (requireAuth()) {
     return currentCourse.modules[mi].videos.every((_, vi) => s.has(lessonId(mi, vi)));
   }
 
+  // sequential progression: lesson N+1 unlocks only after lesson N's quiz is passed (score >= 60)
+  function flatLessons() {
+    const out = [];
+    currentCourse.modules.forEach((m, mi) => m.videos.forEach((_, vi) => out.push({ mi, vi })));
+    return out;
+  }
+  function lessonScores() { return currentCourse.lesson_scores || {}; }
+  function lessonPassed(mi, vi) {
+    const sc = lessonScores()[`${mi + 1}:${vi + 1}`];
+    return sc !== undefined && sc >= 60;
+  }
+  function lessonUnlocked(idx) {
+    if (idx === 0) return true;
+    const prev = flatLessons()[idx - 1];
+    return lessonPassed(prev.mi, prev.vi);
+  }
+
   function refreshModuleBadges() {
     currentCourse.modules.forEach((m, mi) => {
       const el = document.getElementById("mq" + mi);
@@ -157,10 +179,12 @@ if (requireAuth()) {
           <span class="text-emerald-700 font-semibold">✔ Module completed — ${currentCourse.completed_modules[String(mi + 1)]}%</span></div>`;
       } else {
         const doneCount = m.videos.filter((_, vi) => doneSet().has(lessonId(mi, vi))).length;
-        el.disabled = !ready;
+        const prevPassed = mi === 0 || lessonPassed(mi - 1, currentCourse.modules[mi - 1].videos.length - 1);
+        el.disabled = !(ready && prevPassed);
         el.className = "w-full py-2 rounded-full text-sm font-semibold " +
-          (ready ? "bg-orange-400 text-white hover:bg-orange-500" : "bg-slate-100 text-slate-400 cursor-not-allowed");
-        el.textContent = ready ? "📝 Take Module Quiz (5 questions)"
+          (ready && prevPassed ? "bg-orange-400 text-white hover:bg-orange-500" : "bg-slate-100 text-slate-400 cursor-not-allowed");
+        el.textContent = ready && prevPassed ? "📝 Take Module Quiz (5 questions)"
+          : !prevPassed ? "🔒 Pass the previous module's quiz first"
           : `🔒 Mark all lessons complete (${doneCount}/${m.videos.length}) to unlock quiz`;
       }
     });
@@ -197,18 +221,24 @@ if (requireAuth()) {
           </span>
         </button>
         <div id="mb${mi}" class="module-body ${mi === 0 ? '' : 'hidden'} border-t border-slate-100">
-          ${m.videos.map((v, vi) => `
+          ${m.videos.map((v, vi) => {
+            const flatIdx = flatLessons().findIndex(f => f.mi === mi && f.vi === vi);
+            const lessonUnlockedIdx = lessonUnlocked(flatIdx);
+            const lessonScore = lessonScores()[`${mi + 1}:${vi + 1}`];
+            return `
             <div class="flex items-stretch border-b border-slate-50">
               <div class="video-row flex items-center gap-2 px-4 py-2.5 flex-1 cursor-pointer hover:bg-blue-50"
                  onclick="play({yt:'${v.yt}', playlist:${!!v.playlist}}, '${v.title.replace(/'/g, "\\'")}', ${mi}, ${vi})">
-              <span class="text-red-600">▶</span>
-              <span class="text-sm text-slate-700 flex-1">${v.title}</span>
+              <span class="${lessonUnlockedIdx ? 'text-red-600' : 'text-slate-300'}">${lessonUnlockedIdx ? '▶' : '🔒'}</span>
+              <span class="text-sm ${lessonUnlockedIdx ? 'text-slate-700' : 'text-slate-400'} flex-1">${v.title}${lessonScore ? ` <span class="text-[10px] font-bold ${lessonScore >= 60 ? 'text-emerald-600' : 'text-red-500'}">(${lessonScore}%)</span>` : ''}</span>
               <span class="text-emerald-600 hidden" data-done="${lessonId(mi, vi)}">✔</span>
                 ${v.playlist ? '<span class="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">playlist</span>' : ''}
               </div>
-              <button onclick="startLessonQuiz(${mi + 1}, ${vi + 1}, this)" disabled
-                class="lq-btn px-3 text-xs font-semibold text-blue-700 hover:bg-blue-50 border-l border-slate-100 disabled:text-slate-300">Quiz</button>
-            </div>`).join("")}
+              ${lessonUnlockedIdx ? `<button onclick="startLessonQuiz(${mi + 1}, ${vi + 1}, this)" disabled
+                class="lq-btn px-3 text-xs font-semibold text-blue-700 hover:bg-blue-50 border-l border-slate-100 disabled:text-slate-300">Quiz</button>`
+                : '<span class="px-3 text-xs text-slate-300 border-l border-slate-100 flex items-center">🔒</span>'}
+            </div>`;
+          }).join("")}
           <div class="p-3">
             <button id="mq${mi}" onclick="startModuleQuiz(${mi + 1})" disabled
               class="w-full py-2 rounded-full text-sm font-semibold bg-slate-100 text-slate-400 cursor-not-allowed">Complete all lessons to unlock quiz</button>
@@ -318,7 +348,7 @@ if (requireAuth()) {
           ${!r.strength && !r.weakness ? '<span class="text-emerald-700 font-semibold">Perfect score — no weaknesses detected 🎉</span>' : ""}
         </div>
         <p class="text-xs text-slate-400 mt-2">Role readiness ${r.readiness_pct}%</p>
-        <button onclick="closeQuiz()" class="mt-4 px-6 py-2 rounded-full bg-blue-700 text-white font-semibold text-sm">Continue learning</button>
+        <button onclick="location.reload()" class="mt-4 px-6 py-2 rounded-full bg-blue-700 text-white font-semibold text-sm">${r.lesson_score >= 60 ? "Continue to next lesson →" : "Retry lesson quiz"}</button>
       </div>`;
   }
   window.submitLessonQuiz = submitLessonQuiz;

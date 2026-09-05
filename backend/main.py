@@ -316,6 +316,10 @@ def get_roadmap_course(course_key: str, authorization: Optional[str] = Header(No
     done_rows = conn.execute(
         "SELECT chapter_no, quiz_score FROM chapter_progress WHERE user_id=? AND course_id=?",
         (user_id, f"roadmap:{course_key}")).fetchall()
+    lesson_scores = {f"{r['module_no']}:{r['video_no']}": r["score"]
+                     for r in conn.execute(
+        "SELECT module_no, video_no, score FROM lesson_quizzes WHERE user_id=? AND course_key=? AND score IS NOT NULL",
+        (user_id, course_key)).fetchall()}
     conn.close()
     if not assessment_done:
         raise HTTPException(403, "Take the competency assessment before accessing your learning roadmap")
@@ -326,6 +330,7 @@ def get_roadmap_course(course_key: str, authorization: Optional[str] = Header(No
     done = {r["chapter_no"]: r["quiz_score"] for r in done_rows}
     return {**c,
             "completed_modules": {str(k): v for k, v in done.items()},
+            "lesson_scores": lesson_scores,
             "progress_pct": round(100 * len(done) / max(1, len(c["modules"])))}
 
 
@@ -1155,6 +1160,11 @@ def lesson_quiz_complete(course_key: str, module_no: int, video_no: int, body: C
 
     ge.update_competency(user_id, area_scores)
     s_w = strength_weakness(area_scores)
+    conn = get_db()
+    conn.execute("UPDATE lesson_quizzes SET score=? WHERE user_id=? AND course_key=? AND module_no=? AND video_no=?",
+                 (score, user_id, course_key, module_no, video_no))
+    conn.commit()
+    conn.close()
     ge.log_event(user_id, "lesson_quiz_completed",
                  {"course_key": course_key, "module_no": module_no, "video_no": video_no,
                   "score": score, "strength": s_w[0], "weakness": s_w[1]})

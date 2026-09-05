@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS lesson_quizzes (
     video_id TEXT NOT NULL,
     questions_json TEXT NOT NULL,
     generator TEXT NOT NULL,
+    score REAL,
     UNIQUE(user_id, course_key, module_no, video_no)
 );
 CREATE TABLE IF NOT EXISTS personalized_quizzes (
@@ -142,6 +143,9 @@ def init_db():
     cols = [r[1] for r in conn.execute("PRAGMA table_info(transcripts)")]
     if "indexed" not in cols:
         conn.execute("ALTER TABLE transcripts ADD COLUMN indexed INTEGER NOT NULL DEFAULT 0")
+    lcols = [r[1] for r in conn.execute("PRAGMA table_info(lesson_quizzes)")]
+    if "score" not in lcols:
+        conn.execute("ALTER TABLE lesson_quizzes ADD COLUMN score REAL")
     conn.execute(
         "INSERT OR IGNORE INTO users (name, email, password, designation, department) VALUES (?,?,?,?,?)",
         (DEMO_USER["name"], DEMO_USER["email"], DEMO_USER["password"],
