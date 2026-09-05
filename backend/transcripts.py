@@ -1,11 +1,28 @@
-"""YouTube transcript fetching + caching for transcript-grounded module quizzes."""
+"""YouTube transcript fetching + caching for transcript-grounded module quizzes.
+
+Set TRANSCRIPT_PROXY (e.g. http://user:pass@host:port) in the environment to
+route YouTube requests through a proxy — needed on cloud hosts whose IPs are
+blocked by YouTube. Transcripts are indexed into Pinecone on first fetch, so
+the proxy is only needed once per video."""
+import os
+
 from db import get_db
+
+
+def _proxy_config():
+    """Optional egress proxy for YouTube (cloud IPs are often blocked).
+    Set TRANSCRIPT_PROXY in the environment, e.g. http://user:pass@host:port."""
+    proxy_url = os.environ.get("TRANSCRIPT_PROXY")
+    if not proxy_url:
+        return None
+    from youtube_transcript_api.proxies import GenericProxyConfig
+    return GenericProxyConfig(proxy_url=proxy_url)
 
 
 def _fetch_video(video_id: str) -> str | None:
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
-        api = YouTubeTranscriptApi()
+        api = YouTubeTranscriptApi(proxy_config=_proxy_config())
         try:
             t = api.fetch(video_id, languages=["en"])
         except Exception:
