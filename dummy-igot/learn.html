@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Course — iGOT Karmayogi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="common.js"></script>
+<style>body { font-family: 'Poppins', sans-serif; }</style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+<div id="header"></div>
+
+<main class="mx-auto max-w-3xl px-6 py-8 mb-16">
+  <a href="dashboard.html" class="text-sm text-slate-500 hover:text-blue-700">← Back to dashboard</a>
+  <h1 id="courseName" class="mt-2 text-2xl font-bold text-[#1a3a6b]">Loading…</h1>
+  <p id="courseMeta" class="text-sm text-slate-500"></p>
+
+  <div class="mt-4 bg-white rounded-xl border border-slate-100 p-4">
+    <div class="flex justify-between text-xs text-slate-500 mb-1"><span>Course progress</span><span id="progLabel">0%</span></div>
+    <div class="h-2 bg-slate-100 rounded-full"><div id="progBar" class="h-2 bg-blue-600 rounded-full transition-all" style="width:0%"></div></div>
+  </div>
+
+  <div id="chapters" class="mt-6 space-y-3"></div>
+
+  <!-- Chapter quiz modal -->
+  <div id="quizModal" class="hidden fixed inset-0 z-[60] bg-black/50 flex items-center justify-center px-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 max-h-[90vh] overflow-y-auto">
+      <h3 id="quizTitle" class="font-bold text-[#1a3a6b]"></h3>
+      <div id="quizBody" class="mt-4 space-y-5"></div>
+      <p id="quizError" class="hidden text-sm text-red-600 mt-3"></p>
+      <div class="mt-5 flex justify-end gap-3">
+        <button onclick="closeQuiz()" class="px-5 py-2 rounded-full border border-slate-300 text-slate-600 text-sm">Cancel</button>
+        <button id="quizSubmitBtn" onclick="submitQuiz()" class="px-6 py-2 rounded-full bg-orange-400 text-white font-semibold text-sm hover:bg-orange-500">Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div id="resultCard" class="hidden mt-6 bg-white rounded-2xl border border-slate-100 p-6 text-center"></div>
+</main>
+
+<script>
+if (requireAuth()) {
+  document.getElementById("header").innerHTML = renderHeader("");
+  const courseId = new URLSearchParams(location.search).get("course");
+  let quiz = null, chapterNo = null;
+
+  async function load() {
+    const [chs, enr] = await Promise.all([
+      api(`/api/courses/${courseId}/chapters`),
+      api("/api/enrollments"),
+    ]);
+    const mine = enr.find(e => e.course_id === courseId);
+    document.getElementById("courseName").textContent = chs.course_name;
+    document.getElementById("courseMeta").textContent = `${chs.chapters.length} chapters · complete each chapter quiz to progress`;
+    setProgress(mine ? mine.progress_pct : 0, mine ? mine.status : "not enrolled");
+
+    document.getElementById("chapters").innerHTML = chs.chapters.map(ch => {
+      const done = mine && mine.progress_pct >= (ch.chapter_no / chs.chapters.length) * 100;
+      return `
+      <div class="bg-white rounded-xl border border-slate-100 p-5 flex items-center gap-4">
+        <span class="w-10 h-10 rounded-full flex items-center justify-center font-bold ${done ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-50 text-blue-700'}">${done ? '✔' : ch.chapter_no}</span>
+        <div class="flex-1">
+          <p class="font-semibold">${ch.title}</p>
+          <p class="text-xs text-slate-400">${fmtMins(ch.durationMinutes)} · competencies: ${ch.areas.join(", ")}</p>
+        </div>
+        <button onclick="startChapter(${ch.chapter_no})" class="px-5 py-2 rounded-full text-sm font-semibold ${done ? 'border border-emerald-300 text-emerald-700' : 'bg-blue-700 text-white hover:bg-blue-800'}">${done ? 'Retake quiz' : 'Learn & take quiz'}</button>
+      </div>`;
+    }).join("");
+  }
+
+  function setProgress(pct, status) {
+    document.getElementById("progBar").style.width = pct + "%";
+    document.getElementById("progLabel").textContent = `${pct}% (${status})`;
+  }
+
+  async function startChapter(no) {
+    chapterNo = no;
+    quiz = await api(`/api/courses/${courseId}/chapters/${no}/quiz`, { method: "POST" });
+    document.getElementById("quizTitle").textContent = `Chapter ${no}: ${quiz.chapter_title} — Chapter Quiz`;
+    document.getElementById("quizBody").innerHTML = quiz.questions.map((q, qi) => `
+      <div>
+        <p class="text-sm font-medium">${qi + 1}. ${q.text}</p>
+        <div class="mt-2 grid gap-2">
+          ${q.options.map((o, oi) => `
+            <label class="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 text-sm cursor-pointer hover:bg-blue-50">
+              <input type="radio" name="q_${q.id}" value="${oi}" /> ${o}
+            </label>`).join("")}
+        </div>
+      </div>`).join("");
+    document.getElementById("quizError").classList.add("hidden");
+    document.getElementById("quizModal").classList.remove("hidden");
+  }
+
+  function closeQuiz() { document.getElementById("quizModal").classList.add("hidden"); }
+
+  async function submitQuiz() {
+    const answers = quiz.questions.map(q => {
+      const sel = document.querySelector(`input[name="q_${q.id}"]:checked`);
+      return sel ? { question_id: q.id, chosen: +sel.value } : null;
+    });
+    if (answers.some(a => a === null)) {
+      const e = document.getElementById("quizError");
+      e.textContent = "Please answer all questions."; e.classList.remove("hidden"); return;
+    }
+    const r = await api(`/api/courses/${courseId}/chapters/${chapterNo}/complete`, { method: "POST", body: { answers } });
+    closeQuiz();
+    const card = document.getElementById("resultCard");
+    card.classList.remove("hidden");
+    card.innerHTML = `
+      <p class="text-4xl font-extrabold ${r.chapter_score >= 70 ? 'text-emerald-600' : r.chapter_score >= 40 ? 'text-amber-600' : 'text-red-600'}">${r.chapter_score}%</p>
+      <p class="text-slate-600 text-sm mt-1">Chapter quiz score — your competency profile has been updated.</p>
+      <p class="text-sm text-slate-500 mt-2">Course progress: <b>${r.course_progress_pct}%</b> (${r.course_status})</p>
+      ${r.course_status === 'completed'
+        ? '<p class="mt-3 text-emerald-700 font-semibold">🎉 Course completed! Your roadmap has been refreshed.</p><a href="dashboard.html" class="inline-block mt-3 px-6 py-2 rounded-full bg-orange-400 text-white font-semibold">Back to Dashboard</a>'
+        : '<button onclick="location.reload()" class="mt-3 px-6 py-2 rounded-full bg-blue-700 text-white font-semibold">Continue to next chapter</button>'}`;
+    window.scrollTo({ top: card.offsetTop - 80, behavior: "smooth" });
+  }
+
+  load().catch(e => document.body.insertAdjacentHTML("beforeend", `<p class="text-red-600 p-6">${e.message}</p>`));
+  Object.assign(window, { startChapter, closeQuiz, submitQuiz });
+}
+</script>
+</body>
+</html>

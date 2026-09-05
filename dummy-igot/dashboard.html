@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Dashboard — iGOT Karmayogi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="common.js"></script>
+<style>
+  body { font-family: 'Poppins', sans-serif; }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+<div id="header"></div>
+
+<main class="mx-auto max-w-7xl px-6 py-8">
+  <!-- Profile + readiness -->
+  <section class="grid lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center gap-6">
+      <div class="relative w-28 h-28 shrink-0">
+        <svg viewBox="0 0 100 100" class="w-28 h-28 -rotate-90">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="#e2e8f0" stroke-width="10"/>
+          <circle id="readinessRing" cx="50" cy="50" r="42" fill="none" stroke="#1a6fd4" stroke-width="10"
+                  stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264"/>
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center">
+          <span id="readinessPct" class="text-2xl font-extrabold text-blue-800">–</span>
+          <span class="text-[10px] text-slate-400">readiness</span>
+        </div>
+      </div>
+      <div>
+        <h1 id="profileName" class="text-2xl font-bold text-[#1a3a6b]">Loading…</h1>
+        <p id="profileRole" class="text-sm text-slate-500"></p>
+        <div class="mt-3 flex gap-6 text-center">
+          <div><p id="statHours" class="font-bold text-lg text-blue-800">–</p><p class="text-xs text-slate-400">learning hrs</p></div>
+          <div><p id="statCourses" class="font-bold text-lg text-blue-800">–</p><p class="text-xs text-slate-400">courses</p></div>
+          <div><p id="statGaps" class="font-bold text-lg text-blue-800">–</p><p class="text-xs text-slate-400">open gaps</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <h2 class="font-semibold text-slate-800">Top skill gaps</h2>
+      <div id="gapList" class="mt-3 space-y-3 text-sm"></div>
+    </div>
+  </section>
+
+  <!-- Competency radar -->
+  <section class="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+    <div class="flex items-baseline justify-between">
+      <h2 class="text-lg font-bold text-[#1a3a6b]">Competency Profile</h2>
+      <p class="text-xs text-slate-400">current vs role target — updates with every assessment & course completion</p>
+    </div>
+    <div class="mt-2 grid lg:grid-cols-3 gap-6 items-center">
+      <div class="lg:col-span-2 h-80"><canvas id="radar"></canvas></div>
+      <div id="explainList" class="space-y-2 text-sm text-slate-600"></div>
+    </div>
+  </section>
+
+  <!-- Personalized roadmap (post-assessment only) -->
+  <section class="mt-6">
+    <div class="flex items-baseline justify-between">
+      <h2 class="text-lg font-bold text-[#1a3a6b]">🎯 Personalized for you <span class="text-sm font-normal text-slate-400">— tailored to your gaps</span></h2>
+    </div>
+    <div id="roadmapArea" class="mt-3"></div>
+  </section>
+
+  <!-- Continue learning -->
+  <section class="mt-6">
+    <h2 class="text-lg font-bold text-[#1a3a6b]">Continue learning</h2>
+    <div id="continueArea" class="mt-3 grid md:grid-cols-3 gap-4"></div>
+  </section>
+
+  <!-- Popular catalogue -->
+  <section class="mt-6 mb-12">
+    <h2 class="text-lg font-bold text-[#1a3a6b]">Popular on iGOT Karmayogi</h2>
+    <div id="catalogueArea" class="mt-3 grid md:grid-cols-4 gap-4"></div>
+  </section>
+</main>
+
+<!-- Welcome popup (2 slides) -->
+<div id="welcomeOverlay" class="hidden fixed inset-0 z-[60] bg-black/50 flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+    <div id="ws1" class="p-8 text-center">
+      <div class="mx-auto w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center text-3xl">🪷</div>
+      <h2 class="mt-4 text-2xl font-bold text-[#1a3a6b]">Welcome to iGOT Karmayogi, <span id="welcomeName"></span>! 👋</h2>
+      <p class="mt-2 text-slate-600 text-sm">You're logged in as <span id="welcomeRole" class="font-semibold"></span>.</p>
+      <div class="mt-6 flex justify-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span><span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+      </div>
+      <button onclick="welcomeNext()" class="mt-5 px-8 py-2.5 rounded-full bg-blue-700 text-white font-semibold hover:bg-blue-800">Next →</button>
+      <button onclick="closeWelcome()" class="block mx-auto mt-3 text-xs text-slate-400 hover:text-slate-600 underline">Maybe later</button>
+    </div>
+    <div id="ws2" class="p-8 text-center hidden">
+      <div class="mx-auto w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-3xl">📝</div>
+      <h2 class="mt-4 text-2xl font-bold text-[#1a3a6b]">Take your Competency Assessment</h2>
+      <p class="mt-2 text-slate-600 text-sm">A short assessment tailored to your profile and department. It unlocks your personalized learning roadmap.</p>
+      <div class="mt-6 flex justify-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span><span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+      </div>
+      <div class="mt-5 flex justify-center gap-3">
+        <button onclick="closeWelcome()" class="px-6 py-2.5 rounded-full border border-slate-300 text-slate-600 font-semibold hover:bg-slate-50">Later</button>
+        <a href="assessment.html" class="px-8 py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500">Take Assessment</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+if (requireAuth()) {
+  document.getElementById("header").innerHTML = renderHeader("dashboard.html");
+
+  const overlay = document.getElementById("welcomeOverlay");
+  function showWelcomeOnce() {
+    if (sessionStorage.getItem("welcome_shown")) return;
+    sessionStorage.setItem("welcome_shown", "1");
+    const u = getUser();
+    document.getElementById("welcomeName").textContent = u.name;
+    document.getElementById("welcomeRole").textContent = [u.designation, u.department].filter(Boolean).join(", ") || "Karmayogi";
+    overlay.classList.remove("hidden");
+  }
+  function welcomeNext() { ws1.classList.add("hidden"); ws2.classList.remove("hidden"); }
+  function welcomePrev() { ws2.classList.add("hidden"); ws1.classList.remove("hidden"); }
+  function closeWelcome() { overlay.classList.add("hidden"); }
+  window.closeWelcome = closeWelcome;
+
+  async function load() {
+    const d = await api("/api/dashboard");
+    const p = d.profile;
+    if (!d.assessment_done) showWelcomeOnce();
+    document.getElementById("profileName").textContent = p.name;
+    document.getElementById("profileRole").textContent = [p.designation, p.department].filter(Boolean).join(", ") || "Karmayogi";
+    document.getElementById("readinessPct").textContent = d.readiness_pct + "%";
+    document.getElementById("readinessRing").style.strokeDashoffset = 264 * (1 - d.readiness_pct / 100);
+    document.getElementById("statHours").textContent = d.learning_hours;
+    document.getElementById("statCourses").textContent = d.enrollments.filter(e => e.status === "completed").length + "/" + d.enrollments.length;
+    document.getElementById("statGaps").textContent = d.top_gaps.length;
+
+    // gaps
+    document.getElementById("gapList").innerHTML = d.top_gaps.slice(0, 4).map(g => `
+      <div>
+        <div class="flex justify-between"><span class="font-medium">${g.area}</span><span class="text-slate-400">${g.current}→${g.target}</span></div>
+        <div class="mt-1 h-2 bg-slate-100 rounded-full"><div class="h-2 ${scoreColor(100 - g.gap)} rounded-full" style="width:${Math.max(6, 100 - g.gap)}%"></div></div>
+      </div>`).join("") || '<p class="text-slate-400 text-sm">No gaps — take the assessment to build your profile.</p>';
+
+    // radar
+    const labels = d.competency_vector.map(v => v.area);
+    new Chart(document.getElementById("radar"), {
+      type: "radar",
+      data: {
+        labels,
+        datasets: [
+          { label: "Target", data: d.competency_vector.map(v => v.target), borderColor: "#93c5fd", backgroundColor: "rgba(147,197,253,.2)", pointRadius: 2 },
+          { label: "Current", data: d.competency_vector.map(v => v.current), borderColor: "#1a6fd4", backgroundColor: "rgba(26,111,212,.25)", pointRadius: 2 },
+        ]
+      },
+      options: { maintainAspectRatio: false, scales: { r: { suggestedMin: 0, suggestedMax: 100, ticks: { stepSize: 25 } } } }
+    });
+
+    document.getElementById("explainList").innerHTML = d.explanations.map(e =>
+      `<p class="border-l-2 border-blue-300 pl-3">${e}</p>`).join("") ||
+      '<p class="text-slate-400">Take the assessment to see gap explanations.</p>';
+
+    // personalized roadmap — gated on the assessment; no assessment → no recommendations
+    const area = document.getElementById("roadmapArea");
+    if (!d.assessment_done) {
+      area.innerHTML = `
+        <div class="bg-white rounded-2xl border-2 border-dashed border-blue-200 p-8 text-center">
+          <p class="text-4xl">🔒</p>
+          <p class="mt-2 font-semibold text-slate-700">No recommendations yet — take your assessment first</p>
+          <p class="text-sm text-slate-500 mt-1">We don't guess your skill level. Your 25-question assessment (L1/L2/L3) builds the profile that your personalized roadmap is built from.</p>
+          <a href="assessment.html" class="inline-block mt-4 px-8 py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500">Take Assessment</a>
+        </div>`;
+    } else {
+      const rm = await api("/api/roadmap");
+      if (!rm.courses || rm.courses.length === 0) {
+        area.innerHTML = '<p class="text-sm text-slate-400">No roadmap available for your department yet.</p>';
+      } else {
+        area.innerHTML = `<p class="text-xs text-slate-400 mb-3">Built from your assessment gaps — courses from ${[...new Set(rm.courses.map(c => c.provider))].join(", ")}. All content plays right here.</p>` +
+          rm.courses.map((c, i) => `
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4">
+            <div class="flex items-stretch">
+              <div class="w-2 bg-gradient-to-b from-blue-600 to-sky-400"></div>
+              <div class="p-5 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold px-2 py-0.5 rounded-full ${c.badge === 'ISRO' ? 'bg-orange-100 text-orange-700' : c.badge === 'NPTEL' ? 'bg-blue-100 text-blue-700' : c.badge === 'Domain' ? 'bg-emerald-100 text-emerald-700' : 'bg-violet-100 text-violet-700'}">${c.badge}</span>
+                  <span class="text-xs text-slate-400">Recommended #${i + 1} · ${c.level} · ~${c.hours}h</span>
+                </div>
+                <h3 class="mt-1 font-bold text-[#1a3a6b]">${c.name}</h3>
+                <p class="text-sm text-slate-500 mt-1">${c.description}</p>
+                <p class="text-xs text-slate-400 mt-2">${c.modules.length} modules · ${c.modules.reduce((s, m) => s + m.video_count, 0)} video lessons · ${c.provider}</p>
+                <a href="course_player.html?course=${c.key}" class="inline-block mt-3 px-6 py-2 rounded-full bg-blue-700 text-white text-sm font-semibold hover:bg-blue-800">Start learning →</a>
+              </div>
+            </div>
+          </div>`).join("");
+      }
+    }
+
+    // continue learning
+    const cont = d.enrollments.filter(e => e.status !== "completed");
+    document.getElementById("continueArea").innerHTML = cont.length ? cont.map(e => `
+      <a href="learn.html?course=${e.course_id}" class="block bg-white rounded-xl shadow-sm border border-slate-100 p-4 hover:shadow-md">
+        <p class="font-semibold text-blue-800 text-sm">${e.course.name}</p>
+        <div class="mt-2 h-2 bg-slate-100 rounded-full"><div class="h-2 bg-blue-600 rounded-full" style="width:${e.progress_pct}%"></div></div>
+        <p class="text-xs text-slate-400 mt-1">${e.progress_pct}% complete</p>
+      </a>`).join("")
+      : '<p class="text-sm text-slate-400">Nothing in progress — enrol from your personalized roadmap above.</p>';
+
+    // popular catalogue
+    const cat = await api("/api/v1/content/search", { method: "POST", body: {} });
+    const enrolledIds = new Set(d.enrollments.map(e => e.course_id));
+    document.getElementById("catalogueArea").innerHTML = cat.result.content.slice(0, 8).map(c => `
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
+        <div class="h-20 bg-gradient-to-br ${c.level === 'Advanced' ? 'from-indigo-500 to-violet-700' : c.level === 'Intermediate' ? 'from-sky-500 to-blue-700' : 'from-emerald-500 to-teal-700'}"></div>
+        <div class="p-3 flex flex-col flex-1">
+          <p class="text-sm font-semibold text-blue-800 leading-snug">${c.name}</p>
+          <p class="text-xs text-slate-400 mt-1 flex-1">${c.organisation}</p>
+          <a href="learn.html?course=${c.identifier}" class="mt-2 text-center text-sm py-1.5 rounded-full ${enrolledIds.has(c.identifier) ? 'bg-slate-100 text-slate-500' : 'border border-blue-200 text-blue-800 hover:bg-blue-50'}">${enrolledIds.has(c.identifier) ? 'Continue' : 'Preview'}</a>
+        </div>
+      </div>`).join("");
+  }
+
+  async function enrollFromRoadmap(courseId, already) {
+    if (!already) await api("/api/enrollments", { method: "POST", body: { course_id: courseId } });
+    location.href = "learn.html?course=" + courseId;
+  }
+
+  load().catch(e => document.body.insertAdjacentHTML("beforeend", `<p class="text-red-600 p-6">${e.message}</p>`));
+  Object.assign(window, { welcomeNext, welcomePrev, enrollFromRoadmap });
+}
+</script>
+</body>
+</html>

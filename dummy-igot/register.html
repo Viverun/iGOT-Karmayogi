@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Register — iGOT Karmayogi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  body { font-family: 'Poppins', sans-serif; }
+  .ro-field { background: #f8fafc; cursor: default; }
+</style>
+</head>
+<body class="bg-white min-h-screen text-slate-800">
+
+<header class="pt-4 px-4">
+  <nav class="mx-auto max-w-5xl bg-white rounded-full shadow-lg border border-slate-100 px-6 py-2.5 flex items-center gap-4">
+    <a href="index.html" class="flex items-center gap-2">
+      <span class="text-3xl">🪷</span>
+      <span class="leading-tight">
+        <span class="block font-bold text-xl text-blue-800">कर्मण्योगी भारत</span>
+        <span class="block text-[10px] text-slate-500 border-t border-slate-300 mt-0.5">लोकलहित में कार्यतात्</span>
+      </span>
+    </a>
+    <a href="index.html" class="ml-auto text-sm text-slate-500 hover:text-blue-700">← Back to home</a>
+  </nav>
+</header>
+
+<main class="mx-auto max-w-md mt-10 mb-16">
+  <div class="bg-white rounded-2xl shadow-xl border border-slate-100 p-8">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="text-xl text-slate-500 hover:text-blue-800">←</a>
+      <h1 class="text-2xl font-bold text-slate-900">Register</h1>
+    </div>
+
+    <!-- Profile fetched from the government registry (read-only) -->
+    <div class="mt-6 space-y-4">
+      <div>
+        <label class="text-sm font-medium">Center/State <span class="text-red-500">*</span></label>
+        <div class="mt-1 flex gap-3">
+          <label class="flex items-center gap-2 border border-blue-500 rounded-lg px-4 py-2 text-sm flex-1">
+            <input type="radio" checked disabled /> Center
+          </label>
+          <label class="flex items-center gap-2 border border-slate-300 rounded-lg px-4 py-2 text-sm flex-1 text-slate-400">
+            <input type="radio" disabled /> State
+          </label>
+        </div>
+      </div>
+      <div>
+        <label class="text-sm font-medium">Ministry/Department <span class="text-red-500">*</span></label>
+        <input readonly value="Department of Space and ISRO HQ"
+               class="ro-field mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Organisation <span class="text-red-500">*</span></label>
+        <input readonly value="Advanced Data Processing Research Institute (ADRIN)"
+               class="ro-field mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+      </div>
+      <p class="flex justify-between text-xs text-slate-400"><span>Not found yet?</span><a href="#" class="text-blue-700 font-medium">Request for help</a></p>
+      <div>
+        <label class="text-sm font-medium">Designation <span class="text-red-500">*</span></label>
+        <input readonly value="Analyst"
+               class="ro-field mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Email <span class="text-red-500">*</span></label>
+        <input readonly value="analyst@adrin.gov.in"
+               class="ro-field mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+        <p class="mt-2 text-xs text-slate-400">Not able to proceed? Get registered through your MDO.</p>
+      </div>
+      <p id="error" class="hidden text-sm text-red-600"></p>
+      <button id="registerBtn" onclick="doRegister()"
+              class="w-full py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500 disabled:opacity-50">
+        Register
+      </button>
+    </div>
+  </div>
+</main>
+
+<script>
+const API = "http://localhost:8001";
+if (localStorage.getItem("igot_token")) location.href = "index.html";
+
+// The moment the user clicks Register, the logged-in experience begins.
+async function doRegister() {
+  const errEl = document.getElementById("error");
+  const btn = document.getElementById("registerBtn");
+  btn.disabled = true; errEl.classList.add("hidden");
+  try {
+    const res = await fetch(`${API}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Analyst (ADRIN)",
+        email: "analyst@adrin.gov.in",
+        designation: "Analyst",
+        department: "Department of Space and ISRO HQ",
+        password: "demo123",
+      }),
+    });
+    if (!res.ok && res.status !== 409) {  // 409 = already registered, fine for the demo
+      const data = await res.json();
+      throw new Error(data.detail || "Registration failed");
+    }
+    const login = await fetch(`${API}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "analyst@adrin.gov.in", password: "demo123" }),
+    });
+    const data = await login.json();
+    if (!login.ok) throw new Error(data.detail || "Sign-in failed");
+    localStorage.setItem("igot_token", data.access_token);
+    localStorage.setItem("igot_user", JSON.stringify(data.user));
+    sessionStorage.removeItem("welcome_shown");  // welcome popup plays on the dashboard
+    location.href = "dashboard.html";
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove("hidden");
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

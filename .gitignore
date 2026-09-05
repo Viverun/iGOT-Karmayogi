@@ -1,0 +1,5 @@
+backend/.env
+backend/igot.db
+__pycache__/
+*.pyc
+.venv/

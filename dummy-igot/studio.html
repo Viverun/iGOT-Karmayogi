@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trainer Studio — iGOT Karmayogi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="common.js"></script>
+<style>
+  body { font-family: 'Poppins', sans-serif; }
+  .opt:hover { border-color: #1d4ed8; background: #eff6ff; }
+  .opt.selected { border-color: #1d4ed8; background: #dbeafe; }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+<div id="header"></div>
+
+<main class="mx-auto max-w-4xl px-6 py-8 mb-16">
+  <h1 class="text-2xl font-bold text-[#1a3a6b]">🛠️ Trainer Studio</h1>
+  <p class="text-sm text-slate-500 mt-1">Generate assessments two ways: from the learner's competency memory + recommended courses (AI, recommended), or from freshly uploaded material.</p>
+
+  <!-- ═══ 1. Personalized quiz from memory (priority) ═══ -->
+  <div class="mt-6 bg-white rounded-2xl shadow-md border-2 border-orange-200 overflow-hidden">
+    <div class="bg-gradient-to-r from-orange-400 to-amber-400 text-white px-6 py-3 flex items-center gap-2">
+      <span class="font-bold text-lg">🧠 Personalized Assessment — from memory & recommended courses</span>
+      <span class="ml-auto text-xs bg-white/25 rounded-full px-2 py-1">Priority mode</span>
+    </div>
+    <div class="p-6">
+      <div id="previewArea" class="text-sm text-slate-500">Reading your competency memory…</div>
+      <div id="personalizedQuiz" class="hidden mt-5"></div>
+    </div>
+  </div>
+
+  <!-- ═══ 2. Upload material (secondary) ═══ -->
+  <div class="mt-6 grid md:grid-cols-2 gap-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <h2 class="font-semibold text-slate-800">📤 Upload learning material</h2>
+      <p class="text-xs text-slate-400 mt-1">PDF/TXT — chunks are embedded into the vector store on upload.</p>
+      <form id="uploadForm" class="mt-4">
+        <input id="file" type="file" accept=".pdf,.txt" required
+               class="w-full border border-dashed border-slate-300 rounded-xl p-5 text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-50 file:text-blue-700 file:font-semibold" />
+        <button type="submit" id="uploadBtn" class="mt-4 w-full py-2.5 rounded-full bg-blue-700 text-white font-semibold hover:bg-blue-800 disabled:opacity-50">Upload &amp; index</button>
+        <p id="uploadStatus" class="mt-3 text-sm text-slate-500"></p>
+      </form>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <h2 class="font-semibold text-slate-800">⚙️ Generate quiz from material</h2>
+      <p class="text-xs text-slate-400 mt-1">gpt-5-mini generates MCQs grounded in your document, targeted at the learner's weak areas via Pinecone retrieval.</p>
+      <div class="mt-4 flex gap-3 items-end">
+        <div>
+          <label class="text-xs text-slate-500">Questions</label>
+          <select id="qCount" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option>3</option><option selected>5</option><option>8</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-500">Bloom level</label>
+          <select id="bloom" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option>Remember</option><option selected>Understand</option><option>Apply</option><option>Analyze</option>
+          </select>
+        </div>
+        <button id="genBtn" onclick="generateFromMaterial()" disabled
+                class="flex-1 py-2.5 rounded-full bg-blue-700 text-white font-semibold hover:bg-blue-800 disabled:opacity-40">Generate</button>
+      </div>
+      <p id="genStatus" class="mt-3 text-sm text-slate-500"></p>
+    </div>
+  </div>
+
+  <!-- Shared generated-quiz view -->
+  <div id="quizSection" class="hidden mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+    <div class="flex items-baseline justify-between">
+      <h2 id="quizHeading" class="font-semibold text-slate-800">Generated assessment</h2>
+      <span id="genBadge" class="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700"></span>
+    </div>
+    <div id="quizView" class="mt-4 space-y-5"></div>
+    <button id="gradeBtn" onclick="gradeCurrent()" class="mt-5 px-8 py-2.5 rounded-full bg-blue-700 text-white font-semibold hover:bg-blue-800">Submit answers</button>
+    <div id="gradeResult" class="mt-5"></div>
+  </div>
+</main>
+
+<script>
+if (requireAuth()) {
+  document.getElementById("header").innerHTML = renderHeader("studio.html");
+  let currentQuiz = null, currentGradePath = null, currentMaterial = null;
+
+  /* ---- 1. personalized (memory + recommended courses) ---- */
+  async function loadPreview() {
+    const p = await api("/api/personalized/preview");
+    const area = document.getElementById("previewArea");
+    const weakChips = p.weak_areas.map(a =>
+      `<span class="inline-block text-xs font-semibold bg-red-50 text-red-700 border border-red-200 rounded-full px-2.5 py-1 mr-1 mb-1">${a}</span>`).join("");
+    const rm = p.recommended_module;
+    area.innerHTML = `
+      <p class="font-semibold text-slate-800">Your weakest competency areas (from persistent memory):</p>
+      <div class="mt-2">${weakChips || '<span class="text-slate-400">No gaps detected yet.</span>'}</div>
+      ${rm ? `
+      <div class="mt-4 border border-slate-100 rounded-xl p-4 bg-slate-50">
+        <p class="text-xs text-slate-400 uppercase tracking-wide">Recommended grounding</p>
+        <p class="font-semibold text-blue-800 mt-1">${rm.course_name} — ${rm.module_title}</p>
+        <p class="text-xs text-slate-500 mt-1">${rm.lessons} video lessons · matches: ${rm.matched_areas.join(", ")} · role readiness ${p.readiness_pct}%</p>
+      </div>
+      <button id="pGenBtn" onclick="generatePersonalized()"
+        class="mt-4 px-8 py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500">
+        ⚡ Generate personalized quiz from lecture transcripts
+      </button>
+      <p class="text-xs text-slate-400 mt-2">LLM: ${p.llm_available ? "gpt-5-mini ready" : "unavailable — competency bank fallback"} · questions are grounded in the module's actual video transcripts and target your weak areas.</p>`
+      : '<p class="mt-3 text-slate-400">No recommended module matches your weak areas yet.</p>'}`;
+  }
+
+  async function generatePersonalized() {
+    const btn = document.getElementById("pGenBtn");
+    btn.disabled = true; btn.textContent = "⚡ Generating from transcripts… (may take ~30s)";
+    try {
+      const r = await api("/api/personalized/generate", { method: "POST", body: { n: 5 } });
+      currentQuiz = r;
+      currentGradePath = `/api/personalized/${r.quiz_id}/grade`;
+      showQuiz({
+        heading: "Personalized assessment — targeted at your weak areas",
+        badge: r.generator === "llm-transcript" ? "AI · grounded in lecture transcripts" : "competency bank",
+        status: `Focus: ${r.focus_areas.join(", ")}` +
+          (r.grounded_in ? ` · grounded in "${r.grounded_in.title}" (${r.grounded_in.course_key.replace(/-/g, " ")})` : "") +
+          ` · ${r.transcript_videos_used || 0} transcripts used`,
+        questions: r.questions,
+      });
+    } catch (e) { alert(e.message); }
+    btn.disabled = false; btn.textContent = "⚡ Generate personalized quiz from lecture transcripts";
+  }
+  window.generatePersonalized = generatePersonalized;
+
+  /* ---- 2. upload + material quiz ---- */
+  document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("uploadBtn"), st = document.getElementById("uploadStatus");
+    const file = document.getElementById("file").files[0];
+    if (!file) return;
+    btn.disabled = true; st.textContent = "Uploading & indexing chunks into vector store…";
+    const fd = new FormData(); fd.append("file", file);
+    try {
+      const r = await api("/api/materials/upload", { method: "POST", body: fd });
+      st.innerHTML = `✔ Indexed <b>${r.chunks}</b> chunks (${r.chars} chars) — LLM: <b>${r.llm_available ? "gpt-5-mini ready" : "fallback mode"}</b>`;
+      document.getElementById("genBtn").disabled = false;
+      currentMaterial = r.material_id;
+    } catch (err) { st.textContent = "✘ " + err.message; }
+    btn.disabled = false;
+  });
+
+  async function generateFromMaterial() {
+    const btn = document.getElementById("genBtn"), st = document.getElementById("genStatus");
+    btn.disabled = true; btn.textContent = "Generating…";
+    try {
+      const r = await api(`/api/materials/${currentMaterial}/generate-quiz?n=${document.getElementById("qCount").value}&level=${document.getElementById("bloom").value}&personalized=true`, { method: "POST" });
+      currentQuiz = r;
+      currentGradePath = `/api/materials/quizzes/${r.quiz_id}/grade`;
+      showQuiz({
+        heading: "Assessment from uploaded material",
+        badge: r.generator === "llm" ? "AI · grounded in your document" : "fallback generator",
+        status: r.personalized_for_areas.length ? `Targeted at weak areas: ${r.personalized_for_areas.join(", ")} · ${r.chunks_used} chunks retrieved` : `${r.chunks_used} chunks retrieved`,
+        questions: r.questions,
+      });
+    } catch (err) { st.textContent = "✘ " + err.message; }
+    btn.disabled = false; btn.textContent = "Generate";
+  }
+  window.generateFromMaterial = generateFromMaterial;
+
+  /* ---- shared quiz rendering + grading ---- */
+  function showQuiz({ heading, badge, status, questions }) {
+    document.getElementById("quizHeading").textContent = heading;
+    document.getElementById("genBadge").textContent = badge;
+    document.getElementById("genStatus").innerHTML = status;
+    currentQuiz.questions = questions;
+    document.getElementById("quizView").innerHTML = questions.map((q, qi) => `
+      <div class="border border-slate-100 rounded-xl p-4">
+        <p class="text-sm font-medium">${qi + 1}. ${q.question}
+          ${q.level ? `<span class="text-[10px] font-bold rounded px-1.5 py-0.5 ml-1 ${q.level === 'L1' ? 'bg-green-100 text-green-700' : q.level === 'L2' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">${q.level}</span>` : ""}
+        </p>
+        <div class="mt-2 grid gap-2">
+          ${q.options.map((o, oi) => `
+            <label class="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 text-sm cursor-pointer hover:bg-blue-50">
+              <input type="radio" name="gq_${q.id}" value="${oi}" /> ${o}
+            </label>`).join("")}
+        </div>
+        <p class="text-xs text-slate-400 mt-2">${q.area}${q.difficulty && q.difficulty !== q.level ? " · " + q.difficulty : ""}</p>
+      </div>`).join("");
+    document.getElementById("gradeResult").innerHTML = "";
+    document.getElementById("quizSection").classList.remove("hidden");
+    document.getElementById("quizSection").scrollIntoView({ behavior: "smooth" });
+  }
+
+  async function gradeCurrent() {
+    if (!currentQuiz) return;
+    const answers = currentQuiz.questions.map(q => {
+      const sel = document.querySelector(`input[name="gq_${q.id}"]:checked`);
+      return sel ? { question_id: q.id, chosen: +sel.value } : null;
+    });
+    if (answers.some(a => a === null)) { alert("Answer all questions first."); return; }
+    const r = await api(currentGradePath, { method: "POST", body: { answers } });
+    const memoryNote = r.readiness_pct !== undefined
+      ? `<p class="text-sm text-slate-500 mt-2">Saved to competency memory · role readiness now <b>${r.readiness_pct}%</b> ·
+           💪 strength: <b>${r.strength}</b> · 📌 weakness: <b>${r.weakness}</b></p>` : "";
+    document.getElementById("gradeResult").innerHTML = `
+      <div class="border-t border-slate-100 pt-4">
+        <p class="text-3xl font-extrabold ${r.score >= 70 ? 'text-emerald-600' : r.score >= 40 ? 'text-amber-600' : 'text-red-600'}">${r.score}%</p>
+        ${memoryNote}
+        <div class="mt-3 space-y-2">
+          ${r.results.map((res, i) => `
+            <div class="text-sm border-l-2 ${res.correct ? 'border-emerald-400' : 'border-red-400'} pl-3">
+              <b>Q${i + 1} ${res.correct ? "✔ correct" : "✘ incorrect"}</b>${res.level ? ` <span class="text-xs text-slate-400">(${res.level})</span>` : ""} — ${res.explanation || ""}
+              ${res.source_snippet ? `<p class="text-xs text-slate-400 mt-1">Source: "${res.source_snippet}"</p>` : ""}
+            </div>`).join("")}
+        </div>
+      </div>`;
+  }
+  window.gradeCurrent = gradeCurrent;
+
+  loadPreview().catch(e => document.getElementById("previewArea").textContent = "✘ " + e.message);
+}
+</script>
+</body>
+</html>

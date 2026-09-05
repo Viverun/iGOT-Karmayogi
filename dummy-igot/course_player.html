@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Course Player — iGOT Karmayogi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="common.js"></script>
+<style>
+  body { font-family: 'Poppins', sans-serif; }
+  .video-row.active { border-color: #1d4ed8; background: #eff6ff; }
+  .module-body.hidden { display: none; }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+<div id="header"></div>
+
+<main class="mx-auto max-w-6xl px-6 py-8 mb-16">
+  <a href="dashboard.html" class="text-sm text-slate-500 hover:text-blue-700">← Back to dashboard</a>
+  <div id="courseHead" class="mt-2"></div>
+
+  <div class="mt-6 grid lg:grid-cols-3 gap-6">
+    <!-- Player -->
+    <div class="lg:col-span-2">
+      <div id="playerWrap" class="relative bg-slate-900 rounded-2xl overflow-hidden aspect-video shadow-lg">
+        <iframe id="player" class="hidden w-full h-full" src="" title="Course player"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen frameborder="0"></iframe>
+        <div id="playerPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+          <span class="text-6xl">🎬</span>
+          <p class="mt-3 text-white font-semibold text-lg">Loading your first lesson…</p>
+          <p class="text-slate-400 text-sm mt-1">or pick any lesson from the modules on the right</p>
+        </div>
+      </div>
+      <div id="nowPlaying" class="mt-3 bg-white rounded-xl border border-slate-100 p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-xs text-slate-400 uppercase tracking-wide">Now playing</p>
+            <p id="nowTitle" class="font-semibold text-[#1a3a6b] truncate">Select a lesson from a module →</p>
+          </div>
+          <button id="markBtn" onclick="markLessonDone()" class="shrink-0 px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-40" disabled>✓ Mark lesson complete</button>
+        </div>
+      </div>
+      <div class="mt-4 bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-900">
+        Watch all lessons in a module, mark each complete, then take the module quiz — 5 questions generated
+        from the actual lecture transcripts. Your strengths & weaknesses feed your competency profile.
+      </div>
+    </div>
+
+    <!-- Modules -->
+    <div id="modules" class="space-y-3"></div>
+  </div>
+</main>
+
+<!-- Module quiz modal -->
+<div id="quizModal" class="hidden fixed inset-0 z-[60] bg-black/50 flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 max-h-[90vh] overflow-y-auto">
+    <h3 id="quizTitle" class="font-bold text-[#1a3a6b]"></h3>
+    <p id="quizMeta" class="text-xs text-slate-400 mt-1"></p>
+    <div id="quizBody" class="mt-4 space-y-5"></div>
+    <p id="quizError" class="hidden text-sm text-red-600 mt-3"></p>
+    <div id="quizControls" class="mt-5 flex justify-end gap-3">
+      <button onclick="closeQuiz()" class="px-5 py-2 rounded-full border border-slate-300 text-slate-600 text-sm">Cancel</button>
+      <button id="quizSubmitBtn" onclick="submitQuiz()" class="px-6 py-2 rounded-full bg-orange-400 text-white font-semibold text-sm hover:bg-orange-500">Submit</button>
+    </div>
+    <div id="quizResult" class="hidden"></div>
+  </div>
+</div>
+
+<script>
+if (requireAuth()) {
+  document.getElementById("header").innerHTML = renderHeader("dashboard.html");
+  const courseKey = new URLSearchParams(location.search).get("course");
+  const LS_KEY = "lesson_done_" + courseKey;
+  let currentCourse = null, currentQuiz = null, currentModuleNo = null, playingLesson = null;
+
+  function doneSet() { return new Set(JSON.parse(localStorage.getItem(LS_KEY) || "[]")); }
+  function saveDone(set) { localStorage.setItem(LS_KEY, JSON.stringify([...set])); }
+  function lessonId(mi, vi) { return `${mi}:${vi}`; }
+
+  function ytSrc(v) {
+    return v.playlist
+      ? `https://www.youtube.com/embed/videoseries?list=${v.yt}`
+      : `https://www.youtube.com/embed/${v.yt}`;
+  }
+
+  function play(v, title, mi, vi) {
+    document.getElementById("player").src = ytSrc(v);
+    document.getElementById("player").classList.remove("hidden");
+    const ph = document.getElementById("playerPlaceholder");
+    if (ph) ph.remove();
+    document.getElementById("nowTitle").textContent = title;
+    document.querySelectorAll(".video-row").forEach(r => r.classList.remove("active"));
+    playingLesson = { mi, vi, id: lessonId(mi, vi) };
+    const btn = document.getElementById("markBtn");
+    btn.disabled = doneSet().has(playingLesson.id);
+    btn.textContent = doneSet().has(playingLesson.id) ? "✓ Completed" : "✓ Mark lesson complete";
+  }
+  window.play = play;
+
+  function markLessonDone() {
+    if (!playingLesson) return;
+    const s = doneSet(); s.add(playingLesson.id); saveDone(s);
+    document.getElementById("markBtn").textContent = "✓ Completed";
+    document.getElementById("markBtn").disabled = true;
+    refreshModuleBadges();
+  }
+  window.markLessonDone = markLessonDone;
+
+  function moduleAllDone(mi) {
+    const s = doneSet();
+    return currentCourse.modules[mi].videos.every((_, vi) => s.has(lessonId(mi, vi)));
+  }
+
+  function refreshModuleBadges() {
+    currentCourse.modules.forEach((m, mi) => {
+      const el = document.getElementById("mq" + mi);
+      if (!el) return;
+      const ready = moduleAllDone(mi);
+      const already = currentCourse.completed_modules && currentCourse.completed_modules[String(mi + 1)] !== undefined;
+      if (already) {
+        el.outerHTML = `<div id="mq${mi}" class="text-center py-2 text-sm">
+          <span class="text-emerald-700 font-semibold">✔ Module completed — ${currentCourse.completed_modules[String(mi + 1)]}%</span></div>`;
+      } else {
+        el.disabled = !ready;
+        el.className = "w-full py-2 rounded-full text-sm font-semibold " +
+          (ready ? "bg-orange-400 text-white hover:bg-orange-500" : "bg-slate-100 text-slate-400 cursor-not-allowed");
+        el.textContent = ready ? "📝 Take Module Quiz (5 questions)" : "Complete all lessons to unlock quiz";
+      }
+    });
+  }
+
+  function toggleModule(no) {
+    document.getElementById("mb" + no).classList.toggle("hidden");
+  }
+  window.toggleModule = toggleModule;
+
+  async function load() {
+    const c = await api(`/api/roadmap/${courseKey}`);
+    currentCourse = c;
+    const doneCount = Object.keys(c.completed_modules || {}).length;
+    document.getElementById("courseHead").innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full ${c.badge === 'ISRO' ? 'bg-orange-100 text-orange-700' : c.badge === 'NPTEL' ? 'bg-blue-100 text-blue-700' : c.badge === 'Domain' ? 'bg-emerald-100 text-emerald-700' : 'bg-violet-100 text-violet-700'}">${c.badge}</span>
+        <span class="text-xs text-slate-400">${c.provider} · ${c.level} · ~${c.hours}h</span>
+      </div>
+      <h1 class="mt-1 text-2xl font-bold text-[#1a3a6b]">${c.name}</h1>
+      <p class="text-sm text-slate-500 mt-1 max-w-3xl">${c.description}</p>
+      <div class="mt-3 max-w-md">
+        <div class="flex justify-between text-xs text-slate-400 mb-1"><span>Course progress</span><span>${c.progress_pct}%</span></div>
+        <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-blue-600 rounded-full" style="width:${c.progress_pct}%"></div></div>
+      </div>`;
+
+    document.getElementById("modules").innerHTML = c.modules.map((m, mi) => `
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <button onclick="toggleModule(${mi})" class="w-full text-left p-4 flex items-center gap-3 hover:bg-slate-50">
+          <span class="w-8 h-8 rounded-full font-bold flex items-center justify-center text-sm ${c.completed_modules && c.completed_modules[String(mi + 1)] !== undefined ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-50 text-blue-700'}">${c.completed_modules && c.completed_modules[String(mi + 1)] !== undefined ? '✔' : mi + 1}</span>
+          <span class="flex-1">
+            <span class="block text-sm font-semibold text-slate-800">${m.title}</span>
+            <span class="block text-xs text-slate-400">${m.videos.length} lessons</span>
+          </span>
+        </button>
+        <div id="mb${mi}" class="module-body ${mi === 0 ? '' : 'hidden'} border-t border-slate-100">
+          ${m.videos.map((v, vi) => `
+            <div class="video-row flex items-center gap-2 px-4 py-2.5 border-b border-slate-50 cursor-pointer hover:bg-blue-50"
+                 onclick="play({yt:'${v.yt}', playlist:${!!v.playlist}}, '${v.title.replace(/'/g, "\\'")}', ${mi}, ${vi})">
+              <span class="text-red-600">▶</span>
+              <span class="text-sm text-slate-700 flex-1">${v.title}</span>
+              <span class="text-emerald-600 hidden" data-done="${lessonId(mi, vi)}">✔</span>
+              ${v.playlist ? '<span class="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">playlist</span>' : ''}
+            </div>`).join("")}
+          <div class="p-3">
+            <button id="mq${mi}" onclick="startModuleQuiz(${mi + 1})" disabled
+              class="w-full py-2 rounded-full text-sm font-semibold bg-slate-100 text-slate-400 cursor-not-allowed">Complete all lessons to unlock quiz</button>
+          </div>
+        </div>
+      </div>`).join("");
+    // show completed ticks
+    const s = doneSet();
+    document.querySelectorAll("[data-done]").forEach(el => {
+      if (s.has(el.dataset.done)) el.classList.remove("hidden");
+    });
+    refreshModuleBadges();
+  }
+
+  async function startModuleQuiz(moduleNo) {
+    currentModuleNo = moduleNo;
+    const modal = document.getElementById("quizModal");
+    document.getElementById("quizTitle").textContent = "Loading quiz from lecture transcripts…";
+    document.getElementById("quizMeta").textContent = "";
+    document.getElementById("quizBody").innerHTML = "";
+    document.getElementById("quizResult").classList.add("hidden");
+    document.getElementById("quizControls").classList.add("hidden");
+    modal.classList.remove("hidden");
+
+    currentQuiz = await api(`/api/roadmap/${courseKey}/module/${moduleNo}/quiz`, { method: "POST" });
+    document.getElementById("quizTitle").textContent = `Module ${moduleNo}: ${currentQuiz.module_title}`;
+    document.getElementById("quizMeta").textContent =
+      `5 questions generated ${currentQuiz.generator === "llm-transcript" ? "from the actual lecture transcripts (AI-grounded)" : "from the competency bank"} — retaking keeps the same questions`;
+    document.getElementById("quizBody").innerHTML = currentQuiz.questions.map((q, qi) => `
+      <div>
+        <p class="text-sm font-medium">${qi + 1}. ${q.question}
+          <span class="text-[10px] font-bold rounded px-1.5 py-0.5 ml-1 ${q.level === 'L1' ? 'bg-green-100 text-green-700' : q.level === 'L2' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">${q.level || 'L2'}</span>
+        </p>
+        <div class="mt-2 grid gap-2">
+          ${q.options.map((o, oi) => `
+            <label class="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 text-sm cursor-pointer hover:bg-blue-50">
+              <input type="radio" name="q_${q.id}" value="${oi}" /> ${o}
+            </label>`).join("")}
+        </div>
+      </div>`).join("");
+    document.getElementById("quizControls").classList.remove("hidden");
+  }
+  window.startModuleQuiz = startModuleQuiz;
+
+  function closeQuiz() { document.getElementById("quizModal").classList.add("hidden"); }
+  window.closeQuiz = closeQuiz;
+
+  async function submitQuiz() {
+    const answers = currentQuiz.questions.map(q => {
+      const sel = document.querySelector(`input[name="q_${q.id}"]:checked`);
+      return sel ? { question_id: q.id, chosen: +sel.value } : null;
+    });
+    if (answers.some(a => a === null)) {
+      const e = document.getElementById("quizError");
+      e.textContent = "Please answer all questions."; e.classList.remove("hidden"); return;
+    }
+    document.getElementById("quizControls").classList.add("hidden");
+    const r = await api(`/api/roadmap/${courseKey}/module/${currentModuleNo}/complete`, { method: "POST", body: { answers } });
+    const res = document.getElementById("quizResult");
+    res.classList.remove("hidden");
+    res.innerHTML = `
+      <div class="border-t border-slate-100 pt-4 mt-2 text-center">
+        <p class="text-4xl font-extrabold ${r.module_score >= 70 ? 'text-emerald-600' : r.module_score >= 40 ? 'text-amber-600' : 'text-red-600'}">${r.module_score}%</p>
+        <p class="text-sm text-slate-500 mt-1">Module ${currentModuleNo} quiz — saved to your competency profile</p>
+        <div class="mt-3 flex justify-center gap-6 text-sm">
+          <span class="text-emerald-700">💪 Strength: <b>${r.strength}</b></span>
+          <span class="text-red-600">📌 Weakness: <b>${r.weakness}</b></span>
+        </div>
+        <p class="text-xs text-slate-400 mt-2">Course progress ${r.course_progress_pct}% · role readiness ${r.readiness_pct}%</p>
+        <button onclick="location.reload()" class="mt-4 px-6 py-2 rounded-full bg-blue-700 text-white font-semibold text-sm">Continue learning</button>
+      </div>`;
+  }
+  window.submitQuiz = submitQuiz;
+
+  load().then(() => {
+    // auto-select the first lesson so the player is never blank
+    const first = document.querySelector(".video-row");
+    if (first) first.click();
+  }).catch(e => document.body.insertAdjacentHTML("beforeend", `<p class="text-red-600 p-6">${e.message}</p>`));
+}
+</script>
+</body>
+</html>

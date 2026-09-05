@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Competency Assessment — iGOT Karmayogi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  body { font-family: 'Poppins', sans-serif; }
+  .opt:hover { border-color: #1d4ed8; background: #eff6ff; }
+  .opt.selected { border-color: #1d4ed8; background: #dbeafe; }
+</style>
+</head>
+<body class="bg-[#FCE8D5] min-h-screen text-slate-800">
+
+<header class="pt-4 px-4">
+  <nav class="mx-auto max-w-5xl bg-white rounded-full shadow-lg border border-slate-100 px-6 py-2.5 flex items-center gap-4">
+    <a href="index.html" class="flex items-center gap-2">
+      <span class="text-3xl">🪷</span>
+      <span class="leading-tight">
+        <span class="block font-bold text-xl text-blue-800">कर्मण्योगी भारत</span>
+        <span class="block text-[10px] text-slate-500 border-t border-slate-300 mt-0.5">लोकलहित में कार्यतात्</span>
+      </span>
+    </a>
+    <a href="index.html" class="ml-auto text-sm text-slate-500 hover:text-blue-700">← Back to home</a>
+  </nav>
+</header>
+
+<main class="mx-auto max-w-2xl mt-10 mb-16">
+  <div class="bg-white rounded-2xl shadow-xl p-8">
+    <h1 class="text-2xl font-bold text-[#1a3a6b]">Competency Assessment</h1>
+    <p id="deptLine" class="text-sm text-slate-500 mt-1">Loading your department-tailored assessment…</p>
+
+    <!-- progress -->
+    <div class="mt-5">
+      <div class="flex justify-between text-xs text-slate-500 mb-1">
+        <span id="progressLabel">Question 1</span><span id="scoreHint">Answer all questions</span>
+      </div>
+      <div class="w-full h-1.5 bg-slate-100 rounded-full"><div id="progressBar" class="h-1.5 bg-blue-700 rounded-full transition-all" style="width:0%"></div></div>
+    </div>
+
+    <div id="quizArea" class="mt-6"></div>
+
+    <div id="controls" class="mt-6 flex justify-between">
+      <button id="prevBtn" onclick="move(-1)" class="px-6 py-2 rounded-full border border-slate-300 text-slate-600 font-semibold hover:bg-slate-50 invisible">← Previous</button>
+      <button id="nextBtn" onclick="move(1)" class="px-8 py-2 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500" disabled>Next</button>
+    </div>
+
+    <div id="result" class="hidden"></div>
+  </div>
+</main>
+
+<script>
+const API = "http://localhost:8001";
+const token = localStorage.getItem("igot_token");
+if (!token) location.href = "login.html";
+
+let questions = [], idx = 0, chosen = {};
+
+async function init() {
+  const res = await fetch(`${API}/api/assessment/questions`, {
+    headers: { "Authorization": "Bearer " + token }
+  });
+  if (res.status === 401) { location.href = "login.html"; return; }
+  const data = await res.json();
+  questions = data.questions;
+  document.getElementById("deptLine").textContent =
+    `Tailored for ${data.department || "your department"} — ${questions.length} questions across Domain, Functional and Behavioural competencies.`;
+  render();
+}
+
+function render() {
+  const q = questions[idx];
+  const area = document.getElementById("quizArea");
+  area.innerHTML = `
+    <span class="inline-flex text-xs font-medium rounded-full px-3 py-1 ${q.qtype === 'Domain' ? 'bg-blue-100 text-blue-800' : q.qtype === 'Functional' ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'}">${q.qtype} · ${q.area}</span>
+      <span class="inline-flex text-xs font-bold rounded-full px-2 py-1 ml-1 ${q.level === 'L1' ? 'bg-green-100 text-green-700' : q.level === 'L2' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">${q.level}</span>
+    <h2 class="mt-3 text-lg font-semibold leading-snug">${q.text}</h2>
+    <div class="mt-4 space-y-3">
+      ${q.options.map((o, i) => `
+        <button onclick="pick(${i})" data-i="${i}"
+          class="opt w-full text-left border border-slate-200 rounded-lg px-4 py-3 text-sm transition ${chosen[q.id] === i ? 'selected' : ''}">
+          <span class="font-semibold mr-2">${String.fromCharCode(65 + i)}.</span>${o}
+        </button>`).join("")}
+    </div>`;
+  document.getElementById("progressLabel").textContent = `Question ${idx + 1} of ${questions.length}`;
+  document.getElementById("progressBar").style.width = `${(idx / questions.length) * 100}%`;
+  document.getElementById("prevBtn").classList.toggle("invisible", idx === 0);
+  const btn = document.getElementById("nextBtn");
+  const answered = chosen[q.id] !== undefined;
+  btn.disabled = !answered;
+  btn.textContent = idx === questions.length - 1 ? "Submit Assessment" : "Next";
+}
+
+function pick(i) {
+  chosen[questions[idx].id] = i;
+  document.querySelectorAll(".opt").forEach(b => b.classList.toggle("selected", +b.dataset.i === i));
+  document.getElementById("nextBtn").disabled = false;
+}
+
+function move(dir) {
+  if (dir === 1 && idx === questions.length - 1) { submit(); return; }
+  idx = Math.min(questions.length - 1, Math.max(0, idx + dir));
+  render();
+}
+
+async function submit() {
+  const btn = document.getElementById("nextBtn");
+  btn.disabled = true; btn.textContent = "Submitting…";
+  const res = await fetch(`${API}/api/assessment/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+    body: JSON.stringify({ answers: Object.entries(chosen).map(([qid, c]) => ({ question_id: qid, chosen: c })) })
+  });
+  const data = await res.json();
+  document.getElementById("quizArea").classList.add("hidden");
+  document.getElementById("controls").classList.add("hidden");
+  const r = document.getElementById("result");
+  r.classList.remove("hidden");
+  const scoreRows = Object.entries(data.scores).map(([area, pct]) => `
+    <div class="flex items-center gap-3">
+      <span class="w-56 text-sm text-slate-600">${area}</span>
+      <div class="flex-1 h-2.5 bg-slate-100 rounded-full"><div class="h-2.5 rounded-full ${pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500'}" style="width:${pct}%"></div></div>
+      <span class="text-sm font-semibold w-10 text-right">${pct}%</span>
+    </div>`).join("");
+  r.innerHTML = `
+    <div class="text-center">
+      <p class="text-5xl font-extrabold ${data.overall >= 70 ? 'text-emerald-600' : data.overall >= 40 ? 'text-amber-600' : 'text-red-600'}">${data.overall}%</p>
+      <p class="text-slate-600 text-sm mt-1">Overall competency score</p>
+    </div>
+    <h3 class="mt-6 font-semibold text-slate-800">Competency-wise breakdown</h3>
+    <div class="mt-3 space-y-2.5">${scoreRows}</div>
+    <p class="mt-6 text-sm text-slate-500">Your responses have been saved. The AI system will use this competency profile to compute your skill gaps and recommend iGOT courses.</p>
+    <div class="mt-4 flex gap-3">
+      <a href="dashboard.html" class="flex-1 text-center py-2.5 rounded-full border border-blue-200 text-blue-800 font-semibold hover:bg-blue-50">Back to Dashboard</a>
+      <a href="dashboard.html" onclick="sessionStorage.removeItem('welcome_shown')" class="flex-1 text-center py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500">View My Roadmap →</a>
+    </div>`;
+}
+
+init();
+</script>
+</body>
+</html>

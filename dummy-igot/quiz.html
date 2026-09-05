@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Personalized Quiz — iGOT Karmayogi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="common.js"></script>
+<style>
+  body { font-family: 'Poppins', sans-serif; }
+  .opt:hover { border-color: #1d4ed8; background: #eff6ff; }
+  .opt.selected { border-color: #1d4ed8; background: #dbeafe; }
+</style>
+</head>
+<body class="bg-[#FCE8D5] min-h-screen text-slate-800">
+<div id="header"></div>
+
+<main class="mx-auto max-w-2xl mt-8 mb-16 px-4">
+  <div class="bg-white rounded-2xl shadow-xl p-8">
+    <h1 class="text-2xl font-bold text-[#1a3a6b]">🧠 Personalized Practice Quiz</h1>
+    <p id="targetLine" class="text-sm text-slate-500 mt-1">Loading your weakest areas from memory…</p>
+
+    <div class="mt-5">
+      <div class="flex justify-between text-xs text-slate-500 mb-1">
+        <span id="progressLabel"></span><span>targets your weakest competencies</span>
+      </div>
+      <div class="w-full h-1.5 bg-slate-100 rounded-full"><div id="progressBar" class="h-1.5 bg-blue-700 rounded-full transition-all" style="width:0%"></div></div>
+    </div>
+
+    <div id="quizArea" class="mt-6"></div>
+    <div id="controls" class="mt-6 flex justify-between">
+      <button id="prevBtn" onclick="move(-1)" class="px-6 py-2 rounded-full border border-slate-300 text-slate-600 font-semibold hover:bg-slate-50 invisible">← Previous</button>
+      <button id="nextBtn" onclick="move(1)" class="px-8 py-2 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500" disabled>Next</button>
+    </div>
+    <div id="result" class="hidden"></div>
+  </div>
+</main>
+
+<script>
+if (requireAuth()) {
+  document.getElementById("header").innerHTML = renderHeader("dashboard.html");
+  let questions = [], idx = 0, chosen = {};
+
+  async function init() {
+    const data = await api("/api/quiz/personalized");
+    questions = data.questions;
+    document.getElementById("targetLine").textContent =
+      `Targeting your 3 weakest areas: ${data.target_areas.join(", ")}. Scores feed straight back into your competency profile.`;
+    render();
+  }
+
+  function render() {
+    const q = questions[idx];
+    document.getElementById("quizArea").innerHTML = `
+      <span class="inline-flex text-xs font-medium rounded-full px-3 py-1 bg-indigo-100 text-indigo-800">${q.qtype} · ${q.area}</span>
+      <h2 class="mt-3 text-lg font-semibold leading-snug">${q.text}</h2>
+      <div class="mt-4 space-y-3">
+        ${q.options.map((o, i) => `
+          <button onclick="pick(${i})" data-i="${i}"
+            class="opt w-full text-left border border-slate-200 rounded-lg px-4 py-3 text-sm transition ${chosen[q.id] === i ? 'selected' : ''}">
+            <span class="font-semibold mr-2">${String.fromCharCode(65 + i)}.</span>${o}
+          </button>`).join("")}
+      </div>`;
+    document.getElementById("progressLabel").textContent = `Question ${idx + 1} of ${questions.length}`;
+    document.getElementById("progressBar").style.width = `${(idx / questions.length) * 100}%`;
+    document.getElementById("prevBtn").classList.toggle("invisible", idx === 0);
+    const btn = document.getElementById("nextBtn");
+    btn.disabled = chosen[q.id] === undefined;
+    btn.textContent = idx === questions.length - 1 ? "Submit" : "Next";
+  }
+
+  function pick(i) {
+    chosen[questions[idx].id] = i;
+    document.querySelectorAll(".opt").forEach(b => b.classList.toggle("selected", +b.dataset.i === i));
+    document.getElementById("nextBtn").disabled = false;
+  }
+
+  function move(dir) {
+    if (dir === 1 && idx === questions.length - 1) { submit(); return; }
+    idx = Math.min(questions.length - 1, Math.max(0, idx + dir));
+    render();
+  }
+
+  async function submit() {
+    const btn = document.getElementById("nextBtn");
+    btn.disabled = true; btn.textContent = "Submitting…";
+    const res = await api("/api/quiz/personalized/submit", {
+      method: "POST",
+      body: { answers: Object.entries(chosen).map(([qid, c]) => ({ question_id: qid, chosen: c })) }
+    });
+    document.getElementById("quizArea").classList.add("hidden");
+    document.getElementById("controls").classList.add("hidden");
+    const r = document.getElementById("result");
+    r.classList.remove("hidden");
+    const overall = Math.round(Object.values(res.scores).reduce((a, b) => a + b, 0) / Object.values(res.scores).length);
+    r.innerHTML = `
+      <div class="text-center">
+        <p class="text-5xl font-extrabold ${overall >= 70 ? 'text-emerald-600' : overall >= 40 ? 'text-amber-600' : 'text-red-600'}">${overall}%</p>
+        <p class="text-slate-600 text-sm mt-1">Practice score — competency memory updated</p>
+      </div>
+      <h3 class="mt-6 font-semibold text-slate-800">Area scores</h3>
+      <div class="mt-3 space-y-2.5">
+        ${Object.entries(res.scores).map(([area, pct]) => `
+          <div class="flex items-center gap-3">
+            <span class="w-56 text-sm text-slate-600">${area}</span>
+            <div class="flex-1 h-2.5 bg-slate-100 rounded-full"><div class="h-2.5 rounded-full ${scoreColor(pct)}" style="width:${pct}%"></div></div>
+            <span class="text-sm font-semibold w-10 text-right">${pct}%</span>
+          </div>`).join("")}
+      </div>
+      <p class="mt-4 text-sm text-slate-500">Role readiness is now <b>${res.readiness_pct}%</b>. Your roadmap has been refreshed.</p>
+      <a href="dashboard.html" class="inline-block mt-4 px-8 py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500">Back to Dashboard</a>`;
+  }
+
+  init().catch(e => document.body.insertAdjacentHTML("beforeend", `<p class="text-red-600 p-6">${e.message}</p>`));
+  Object.assign(window, { pick, move });
+}
+</script>
+</body>
+</html>

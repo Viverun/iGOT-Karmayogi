@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>iGOT Karmayogi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  body { font-family: 'Poppins', sans-serif; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .confetti { background-image: radial-gradient(circle, rgba(255,255,255,.35) 2px, transparent 2.5px), radial-gradient(circle, rgba(255,255,255,.25) 2px, transparent 2.5px); background-size: 60px 60px, 90px 90px; background-position: 0 0, 30px 40px; }
+</style>
+</head>
+<body class="bg-white text-slate-800">
+
+<!-- ===== Floating Navbar ===== -->
+<header class="sticky top-3 z-50 px-4">
+  <nav class="mx-auto max-w-7xl bg-white rounded-full shadow-lg border border-slate-100 px-6 py-2.5 flex items-center gap-6">
+    <a href="#" class="flex items-center gap-2 shrink-0">
+      <span class="text-3xl">🪷</span>
+      <span class="leading-tight">
+        <span class="block font-bold text-xl text-blue-800">कर्मण्योगी भारत</span>
+        <span class="block text-[10px] tracking-wide text-slate-500 border-t border-slate-300 mt-0.5">लोकलहित में कार्यतात्</span>
+      </span>
+    </a>
+    <ul class="hidden lg:flex items-center gap-6 text-[15px] font-medium text-slate-700 ml-4">
+      <li><a class="hover:text-blue-700" href="#">About Us</a></li>
+      <li><a class="hover:text-blue-700" href="#">Newsroom</a></li>
+      <li><a class="hover:text-blue-700" href="#">Career</a></li>
+      <li><a class="hover:text-blue-700" href="#">Tenders</a></li>
+      <li><a class="hover:text-blue-700" href="#">Notifications</a></li>
+      <li><a class="hover:text-blue-700" href="#">Help Centre</a></li>
+    </ul>
+    <div class="ml-auto flex items-center gap-3" id="authArea">
+      <a href="register.html" class="px-6 py-2 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500">Register</a>
+    </div>
+  </nav>
+</header>
+
+<!-- ===== Hero ===== -->
+<section class="bg-[#FCE8D5] relative overflow-hidden">
+  <div class="absolute left-1/2 top-6 -translate-x-64 w-24 h-24 bg-blue-800 rounded-3xl rotate-45"></div>
+  <div class="absolute right-10 bottom-4 w-28 h-8 bg-orange-400 rounded-full rotate-[-35deg]"></div>
+  <div class="mx-auto max-w-7xl px-6 py-14 grid md:grid-cols-2 gap-10 items-center">
+    <div>
+      <h1 class="text-3xl font-bold text-[#1a3a6b]">iGOT Karmayogi</h1>
+      <h2 class="mt-4 text-4xl font-bold text-orange-500 leading-snug">'Rule-based' to 'Role-based' governance</h2>
+      <p class="mt-10 font-semibold text-slate-700">Follow Us</p>
+      <div class="mt-3 flex gap-3">
+        <a href="#" class="w-10 h-10 rounded-full bg-blue-800 text-white flex items-center justify-center font-bold">𝕏</a>
+        <a href="#" class="w-10 h-10 rounded-full bg-blue-800 text-white flex items-center justify-center font-bold">in</a>
+        <a href="#" class="w-10 h-10 rounded-full bg-blue-800 text-white flex items-center justify-center">▶</a>
+        <a href="#" class="w-10 h-10 rounded-full bg-blue-800 text-white flex items-center justify-center">◎</a>
+        <a href="#" class="w-10 h-10 rounded-full bg-blue-800 text-white flex items-center justify-center font-bold">f</a>
+      </div>
+    </div>
+    <div class="relative">
+      <div class="bg-white rounded-2xl shadow-xl p-3 rotate-[1deg]">
+        <div class="rounded-xl overflow-hidden">
+          <div class="bg-gradient-to-r from-orange-400 to-orange-500 text-center py-2.5 confetti">
+            <span class="text-white font-bold text-xl">Congratulations, Karmayogis!</span>
+          </div>
+          <div class="bg-[#1a3a8f] confetti px-6 py-8 text-center relative">
+            <div class="flex items-end justify-center gap-3">
+              <span class="text-white font-extrabold text-8xl leading-none">1.7</span>
+              <span class="text-left">
+                <span class="block text-orange-400 font-extrabold text-5xl leading-none">Crore+</span>
+                <span class="block text-white font-bold text-3xl leading-tight">Users<br/>Onboarded</span>
+              </span>
+            </div>
+            <p class="mt-5 text-white font-semibold text-lg border-b border-orange-400 inline-block pb-1">Let's continue to learn, grow and lead!</p>
+          </div>
+        </div>
+      </div>
+      <div class="mt-6 flex justify-center gap-2">
+        <span class="w-6 h-1.5 rounded-full bg-orange-500"></span>
+        <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+        <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Blue Stats Band ===== -->
+<section class="bg-[#1a4a9e] text-white">
+  <div class="mx-auto max-w-7xl px-6 py-10 grid grid-cols-2 md:grid-cols-5 gap-8">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">👥</span>
+      <div><p class="text-2xl font-bold">1,72,29,409</p><p class="text-sm text-blue-100">Total Karmayogis Onboarded</p></div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">📚</span>
+      <div><p class="text-2xl font-bold">6,711</p><p class="text-sm text-blue-100">Total Courses</p></div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">✅</span>
+      <div><p class="text-2xl font-bold">15,23,81,557</p><p class="text-sm text-blue-100">Total Completions</p></div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">🙋</span>
+      <div><p class="text-2xl font-bold">16,40,920</p><p class="text-sm text-blue-100">Monthly Active Users</p></div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">📃</span>
+      <div><p class="text-2xl font-bold">2,12,042</p><p class="text-sm text-blue-100">Certificates Issued Yesterday</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Dashboard Row 1 ===== -->
+<section class="mx-auto max-w-7xl px-6 py-10 grid lg:grid-cols-3 gap-6">
+  <!-- Rule to Role Based Learning -->
+  <div class="lg:col-span-2 bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
+    <div class="bg-[#1a6fd4] text-white text-center text-2xl font-bold py-3">Rule to Role Based Learning</div>
+    <div class="p-6 grid md:grid-cols-2 gap-6">
+      <div>
+        <h3 class="font-semibold text-slate-800">Coverage of Role-Relevant Capacity Building Plans (CBPs)</h3>
+        <div class="mt-4 grid grid-cols-2 gap-3">
+          <div class="flex items-center gap-3 bg-slate-50 rounded-lg p-3"><span class="text-2xl">👤</span><div><p class="text-sm text-slate-500">Union CBPs</p><p class="font-bold text-lg">1,434</p></div></div>
+          <div class="flex items-center gap-3 bg-slate-50 rounded-lg p-3"><span class="text-2xl">👥</span><div><p class="text-sm text-slate-500">Employees with CBPs</p><p class="font-bold text-lg">43,45,664</p></div></div>
+          <div class="flex items-center gap-3 bg-slate-50 rounded-lg p-3"><span class="text-2xl">🏫</span><div><p class="text-sm text-slate-500">State CBPs</p><p class="font-bold text-lg">2,609</p></div></div>
+          <div class="flex items-center gap-3 bg-slate-50 rounded-lg p-3"><span class="text-2xl">🏅</span><div><p class="text-sm text-slate-500">Role Relevant Comple…</p><p class="font-bold text-lg">12,374,227</p></div></div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4 md:border-l md:border-slate-200 md:pl-6">
+        <div>
+          <h3 class="font-semibold text-slate-800 text-center">Courses by Competency</h3>
+          <div class="h-44"><canvas id="competencyPie"></canvas></div>
+        </div>
+        <div>
+          <h3 class="font-semibold text-slate-800 text-center">Courses by Level</h3>
+          <div class="mt-3 space-y-2 text-sm">
+            <div class="flex justify-between bg-slate-50 rounded px-3 py-2"><span>Basic</span><span class="font-semibold">3,757</span></div>
+            <div class="flex justify-between bg-slate-50 rounded px-3 py-2"><span>Intermediate</span><span class="font-semibold">1,034</span></div>
+            <div class="flex justify-between bg-slate-50 rounded px-3 py-2"><span>Advanced</span><span class="font-semibold">42</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Democratised Learning -->
+  <div class="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
+    <div class="bg-[#1a6fd4] text-white text-center text-2xl font-bold py-3">Democratised Learning</div>
+    <div class="p-6">
+      <h3 class="font-semibold text-slate-800 text-center">Onboarding and Learning Participation by Group</h3>
+      <div class="mt-2 flex justify-center gap-4 text-xs">
+        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-sky-200 inline-block rounded-sm"></span>Onboarded %</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-sky-500 inline-block rounded-sm"></span>Completion %</span>
+      </div>
+      <div class="h-56"><canvas id="groupBar"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Dashboard Row 2 ===== -->
+<section class="mx-auto max-w-7xl px-6 pb-10 grid lg:grid-cols-2 gap-6">
+  <!-- Ranking -->
+  <div class="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
+    <div class="bg-[#1a6fd4] text-white text-center text-2xl font-bold py-3 flex justify-center items-center gap-2">
+      iGOT Learning Progress Ranking <span class="text-sm bg-white/20 rounded-full w-6 h-6 inline-flex items-center justify-center">i</span>
+    </div>
+    <div class="p-6">
+      <div class="grid grid-cols-2 gap-4 text-sm font-medium">
+        <button class="py-2 rounded-lg bg-sky-100 border border-sky-300 text-slate-800">States and Union Territories</button>
+        <button class="py-2 rounded-lg bg-sky-100 border border-sky-300 text-slate-800">Union Ministries and Departments</button>
+      </div>
+      <div class="mt-4 grid grid-cols-3 gap-4 items-center">
+        <div id="indiaMap" class="col-span-2 h-80"></div>
+        <div class="text-center space-y-4">
+          <div><p class="text-4xl">🥇</p><p class="text-sm font-semibold mt-1">Ministry of Coal</p></div>
+          <div><p class="text-4xl">🥈</p><p class="text-sm font-semibold mt-1">Dept. of Food and Public Distribution</p></div>
+          <div><p class="text-4xl">🥉</p><p class="text-sm font-semibold mt-1">Ministry of Mines</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-6">
+    <!-- Shared National Aspirations -->
+    <div class="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
+      <div class="bg-[#1a6fd4] text-white text-center text-2xl font-bold py-3">Shared National Aspirations</div>
+      <div class="p-6">
+        <p class="text-center font-medium text-slate-700 mb-4">Course Completion for National Priorities</p>
+        <div class="space-y-3">
+          <div class="flex justify-between items-center bg-slate-50 rounded-lg px-4 py-3"><span class="font-medium">AI & Emerging Tech</span><span class="font-bold">3,38,80,712</span></div>
+          <div class="flex justify-between items-center bg-slate-50 rounded-lg px-4 py-3"><span class="font-medium">Citizen Centricity & Jan Bhagidari</span><span class="font-bold">1,50,86,052</span></div>
+          <div class="flex justify-between items-center bg-slate-50 rounded-lg px-4 py-3"><span class="font-medium">Viksit Bharat</span><span class="font-bold">1,10,49,297</span></div>
+        </div>
+      </div>
+    </div>
+    <!-- eHRMS -->
+    <div class="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
+      <div class="bg-[#1a6fd4] text-white text-center text-2xl font-bold py-3">Right Person for the Right Job <span class="italic">(eHRMS)</span></div>
+      <div class="p-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+        <div class="bg-slate-50 rounded-lg p-3"><p class="text-sm text-slate-500">Employees with eHRMS Access</p><p class="font-bold text-xl mt-1">848,896</p></div>
+        <div class="bg-slate-50 rounded-lg p-3"><p class="text-sm text-slate-500">Employees Services Available</p><p class="font-bold text-xl mt-1">57</p></div>
+        <div class="bg-slate-50 rounded-lg p-3"><p class="text-sm text-slate-500">Transfer and Deputation Postings</p><p class="font-bold text-xl mt-1">6,449</p></div>
+        <div class="bg-slate-50 rounded-lg p-3"><p class="text-sm text-slate-500">Pension Claims Processed</p><p class="font-bold text-xl mt-1">369</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Course Carousel ===== -->
+<section class="bg-[#FCE8D5] py-12">
+  <div class="mx-auto max-w-7xl px-6 relative">
+    <button onclick="scrollCards('courseRow',-1)" class="absolute -left-3 top-1/2 z-10 w-11 h-11 rounded-full bg-slate-900 text-white shadow-lg">‹</button>
+    <button onclick="scrollCards('courseRow',1)" class="absolute -right-3 top-1/2 z-10 w-11 h-11 rounded-full bg-slate-900 text-white shadow-lg">›</button>
+    <div id="courseRow" class="flex gap-6 overflow-x-auto no-scrollbar scroll-smooth"></div>
+  </div>
+</section>
+
+<!-- ===== Amrit Gyaan Kosh ===== -->
+<section class="bg-[#FCE8D5] mt-8 rounded-t-[3rem] pt-14 pb-16">
+  <div class="mx-auto max-w-7xl px-6">
+    <div class="flex items-end justify-between mb-8">
+      <div class="w-1/3"></div>
+      <h2 class="text-3xl font-bold text-[#1a3a6b] text-center">Amrit Gyaan Kosh Case Studies</h2>
+      <a href="#" class="text-blue-700 font-medium whitespace-nowrap">Show all ›</a>
+    </div>
+    <div id="agyRow" class="flex gap-6 overflow-x-auto no-scrollbar scroll-smooth relative"></div>
+  </div>
+</section>
+
+<!-- ===== Footer ===== -->
+<footer class="bg-[#0f2a5c] text-blue-100">
+  <div class="mx-auto max-w-7xl px-6 py-10 grid md:grid-cols-3 gap-8 text-sm">
+    <div>
+      <div class="flex items-center gap-2 mb-3"><span class="text-3xl">🪷</span><span class="font-bold text-white text-lg">कर्मण्योगी भारत</span></div>
+      <p>an initiative of Mission Karmayogi — NPCSCB, Government of India. Capacity building of civil services for the future.</p>
+    </div>
+    <div>
+      <p class="text-white font-semibold mb-2">Quick Links</p>
+      <ul class="space-y-1">
+        <li><a href="#" class="hover:text-white">About Us</a></li>
+        <li><a href="#" class="hover:text-white">Notifications</a></li>
+        <li><a href="#" class="hover:text-white">Help Centre</a></li>
+        <li><a href="#" class="hover:text-white">Tenders</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="text-white font-semibold mb-2">Contact</p>
+      <p>Support: helpdesk@igotkarmayogi.gov.in</p>
+      <p class="mt-4 text-blue-200 text-xs">© 2026 iGOT Karmayogi. This is a demo/prototype replica built for a hackathon project — not the official platform.</p>
+    </div>
+  </div>
+</footer>
+
+<!-- Welcome popup (shown to logged-in users) -->
+<div id="welcomeOverlay" class="hidden fixed inset-0 z-[60] bg-black/50 flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+    <!-- Slide 1: welcome -->
+    <div id="ws1" class="p-8 text-center">
+      <div class="mx-auto w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center text-3xl">🪷</div>
+      <h2 class="mt-4 text-2xl font-bold text-[#1a3a6b]">Welcome to iGOT Karmayogi<span id="welcomeName"></span>! 👋</h2>
+      <p class="mt-2 text-slate-600 text-sm">You're logged in as <span id="welcomeRole" class="font-semibold"></span>. Let's continue to learn, grow and lead!</p>
+      <div class="mt-6 flex items-center justify-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+        <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+      </div>
+      <button onclick="welcomeNext()" class="mt-5 px-8 py-2.5 rounded-full bg-blue-700 text-white font-semibold hover:bg-blue-800">Next →</button>
+    </div>
+    <!-- Slide 2: take assessment -->
+    <div id="ws2" class="p-8 text-center hidden">
+      <div class="mx-auto w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-3xl">📝</div>
+      <h2 class="mt-4 text-2xl font-bold text-[#1a3a6b]">Take your Competency Assessment</h2>
+      <p class="mt-2 text-slate-600 text-sm">A short assessment tailored to your profile and department. Your answers build your competency profile and skill-gap analysis.</p>
+      <div class="mt-6 flex items-center justify-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+        <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+      </div>
+      <div class="mt-5 flex items-center justify-center gap-3">
+        <button onclick="welcomePrev()" class="px-6 py-2.5 rounded-full border border-slate-300 text-slate-600 font-semibold hover:bg-slate-50">← Back</button>
+        <a href="assessment.html" class="px-8 py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500">Take Assessment</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Accessibility floating button -->
+<button class="fixed right-4 top-1/2 z-50 w-12 h-12 rounded-full bg-white border-2 border-blue-700 text-blue-700 shadow-lg" title="Accessibility options">♿</button>
+
+<script>
+/* ---------- Course cards ---------- */
+const courses = [
+  { title: "Prevention of Sexual Harassment of Women at Workplace", by: "By Institute of Secretariat Training and Management", time: "1h 52m", emoji: "🤝", bg: "from-slate-700 to-slate-900" },
+  { title: "Fire Safety in Healthcare Facilities", by: "By Ministry of Health and Family Welfare", time: "1h 23m", emoji: "🚒", bg: "from-red-500 to-orange-600" },
+  { title: "Civil Defence Services (नागरिक सुरक्षा सेवाएँ)", by: "By National Disaster Response Force (NDRF)", time: "1h 17m", emoji: "🪖", bg: "from-emerald-600 to-green-800" },
+  { title: "स्वच्छता ही सेवा – 2024 पर प्रशिक्षण मॉड्यूल", by: "By Ministry of Housing and Urban Affairs (MoHUA)", time: "20m", emoji: "🧹", bg: "from-sky-500 to-blue-700" },
+  { title: "Data-Driven Decision Making for Governance", by: "By National e-Governance Division (NeGD)", time: "45m", emoji: "📊", bg: "from-indigo-500 to-violet-700" },
+];
+const agy = [
+  { title: "Water Conservation: A Community Success Story", time: "1h", emoji: "🏭", bg: "from-amber-600 to-orange-800" },
+  { title: "Rural Transformation through Panchayat Planning", time: "1h 30m", emoji: "🏡", bg: "from-teal-600 to-emerald-800" },
+  { title: "Accountlism: Digital Records for Better Governance", time: "2h", emoji: "💻", bg: "from-blue-500 to-sky-700" },
+  { title: "Participatory Groundwater Management", time: "1h", emoji: "🧑‍🌾", bg: "from-lime-600 to-green-800" },
+];
+function cardHTML(c) {
+  return `<div class="min-w-[260px] w-[260px] bg-white rounded-xl shadow-md overflow-hidden shrink-0">
+    <div class="relative h-36 bg-gradient-to-br ${c.theme}" onclick="enroll('${c.identifier}')" style="cursor:pointer">
+      <span class="text-6xl">${c.emoji}</span>
+      <span class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-0.5 rounded">🕐 ${c.durationLabel}</span>
+    </div>
+    <div class="p-4">
+      <span class="inline-flex items-center gap-1 text-orange-600 border border-orange-300 rounded-full px-3 py-0.5 text-xs font-medium">📖 Course</span>
+      <h3 class="mt-2 font-semibold text-blue-800 leading-snug min-h-[3.5rem]">${c.name}</h3>
+      <p class="mt-2 text-xs text-slate-500">By ${c.provider}</p>
+    </div>
+  </div>`;
+}
+const FALLBACK_COURSES = courses.map(c => ({
+  identifier: c.title, name: c.title, provider: c.by.replace(/^By /, ''),
+  durationLabel: c.time, emoji: c.emoji, theme: c.bg
+}));
+function agyCardHTML(c) {
+  return `<div class="min-w-[260px] w-[260px] bg-white rounded-xl shadow-md overflow-hidden shrink-0">
+    <div class="relative h-36 bg-gradient-to-br ${c.bg} flex items-center justify-center">
+      <span class="text-6xl">${c.emoji}</span>
+      <span class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-0.5 rounded">🕐 ${c.time}</span>
+    </div>
+    <div class="p-4">
+      <span class="inline-flex items-center gap-1 text-orange-600 border border-orange-300 rounded-full px-3 py-0.5 text-xs font-medium">📖 Case Study</span>
+      <h3 class="mt-2 font-semibold text-blue-800 leading-snug min-h-[3.5rem]">${c.title}</h3>
+      <p class="mt-2 text-xs text-slate-500">Amrit Gyaan Kosh</p>
+    </div>
+  </div>`;
+}
+async function loadCourses() {
+  const row = document.getElementById('courseRow');
+  try {
+    const res = await fetch('http://localhost:8001/api/v1/content/search', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
+    });
+    const data = await res.json();
+    const apiCourses = data.result.content.map(c => ({
+      identifier: c.identifier, name: c.name, provider: c.organisation,
+      durationLabel: c.duration >= 3600 ? `${Math.round(c.duration/360)/10}h` : `${c.duration/60}m`,
+      emoji: c.competencyType === 'Domain' ? '📘' : c.competencyType === 'Functional' ? '🛠️' : '🌱',
+      theme: c.level === 'Advanced' ? 'from-indigo-500 to-violet-700' : c.level === 'Intermediate' ? 'from-sky-500 to-blue-700' : 'from-emerald-500 to-teal-700'
+    }));
+    row.innerHTML = apiCourses.map(cardHTML).join('');
+  } catch {
+    row.innerHTML = FALLBACK_COURSES.map(cardHTML).join('');
+  }
+}
+loadCourses();
+
+/* ---------- Auth state + welcome popup ---------- */
+function renderAuthArea() {
+  const user = JSON.parse(localStorage.getItem('igot_user') || 'null');
+  const area = document.getElementById('authArea');
+  if (user) {
+    area.innerHTML = `
+      <span class="text-sm text-slate-600">Namaste, <span class="font-semibold text-blue-800">${user.name}</span></span>
+      <a href="dashboard.html" class="px-5 py-2 rounded-full border border-blue-200 text-blue-800 font-semibold hover:bg-blue-50 text-sm">Go to Dashboard</a>
+      <button onclick="logout()" class="px-5 py-2 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500 text-sm">Log out</button>`;
+  }
+}
+function logout() {
+  localStorage.removeItem('igot_token');
+  localStorage.removeItem('igot_user');
+  location.reload();
+}
+function welcomeNext() {
+  document.getElementById('ws1').classList.add('hidden');
+  document.getElementById('ws2').classList.remove('hidden');
+}
+function welcomePrev() {
+  document.getElementById('ws2').classList.add('hidden');
+  document.getElementById('ws1').classList.remove('hidden');
+}
+(function initWelcome() {
+  const user = JSON.parse(localStorage.getItem('igot_user') || 'null');
+  if (!user) return;
+  renderAuthArea();
+  document.getElementById('welcomeName').textContent = ', ' + user.name;
+  document.getElementById('welcomeRole').textContent =
+    [user.designation, user.department].filter(Boolean).join(', ') || 'Karmayogi';
+})();
+
+async function enroll(courseId) {
+  const token = localStorage.getItem('igot_token');
+  if (!token) { location.href = 'login.html'; return; }
+  const res = await fetch('http://localhost:8001/api/enrollments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ course_id: courseId })
+  });
+  if (res.ok) alert('Enrolled successfully! This enrollment + progress status is what the AI system will read via the connector.');
+  else if (res.status === 401) location.href = 'login.html';
+}
+document.getElementById('courseRow').innerHTML = courses.map(cardHTML).join('');
+document.getElementById('agyRow').innerHTML = agy.map(agyCardHTML).join('');
+function scrollCards(id, dir) { document.getElementById(id).scrollBy({ left: dir * 580, behavior: 'smooth' }); }
+
+/* ---------- Charts ---------- */
+Chart.defaults.font.family = "'Poppins', sans-serif";
+new Chart(document.getElementById('competencyPie'), {
+  type: 'pie',
+  data: {
+    labels: ['Domain', 'Functional', 'Behavioural'],
+    datasets: [{ data: [1290, 3113, 231], backgroundColor: ['#bae6fd', '#60a5fa', '#1d4ed8'], borderColor: '#fff' }]
+  },
+  options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } } }
+});
+new Chart(document.getElementById('groupBar'), {
+  type: 'bar',
+  data: {
+    labels: ['Group A', 'Group B', 'Group C,D & Others'],
+    datasets: [
+      { label: 'Onboarded %', data: [7, 12, 82], backgroundColor: '#bae6fd' },
+      { label: 'Completion %', data: [7, 15, 78], backgroundColor: '#3b82f6' },
+    ]
+  },
+  options: {
+    maintainAspectRatio: false,
+    scales: {
+      y: { grid: { display: false }, ticks: { callback: v => v + ' %' } },
+      x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+    },
+    plugins: { legend: { display: false } }
+  }
+});
+
+/* ---------- India choropleth ---------- */
+(async () => {
+  const topo = await (await fetch('assets/india.topo.json')).json();
+  const states = topojson.feature(topo, topo.objects.states).features;
+  // deterministic pseudo rank per state (0–62.5) for demo purposes
+  const vals = states.map((f, i) => +(((Math.sin(i * 7.13) + 1) / 2) * 62.49).toFixed(2));
+  const color = d3.scaleSequential(d3.interpolateOrRd).domain([62.49, 0.22]); // green->orange look approximated
+  const colorScale = t => d3.interpolateRdYlGn(1 - (t - 0.22) / (62.49 - 0.22));
+  const svg = d3.select('#indiaMap').append('svg').attr('viewBox', '0 0 480 520');
+  const proj = d3.geoMercator().fitSize([480, 520], { type: 'FeatureCollection', features: states });
+  const path = d3.geoPath(proj);
+  svg.selectAll('path').data(states).join('path')
+    .attr('d', path)
+    .attr('fill', (d, i) => colorScale(vals[i]))
+    .attr('stroke', '#fff').attr('stroke-width', 0.5)
+    .append('title').text((d, i) => `${d.properties.st_nm}: ${vals[i]}`);
+  // legend
+  const lg = svg.append('g').attr('transform', 'translate(10,420)');
+  lg.append('text').attr('class','text-xs').attr('font-size', 11).text('Rank');
+  const grad = lg.append('defs').append('linearGradient').attr('id', 'rankGrad');
+  grad.selectAll('stop').data(d3.range(0, 1.01, 0.1)).join('stop')
+    .attr('offset', d => d * 100 + '%').attr('stop-color', d => d3.interpolateRdYlGn(1 - d));
+  lg.append('rect').attr('y', 6).attr('width', 120).attr('height', 12).attr('fill', 'url(#rankGrad)').attr('rx', 3);
+  lg.append('text').attr('y', 32).attr('font-size', 10).text('62.49');
+  lg.append('text').attr('x', 100).attr('y', 32).attr('font-size', 10).text('0.22');
+})();
+</script>
+</body>
+</html>
