@@ -52,6 +52,21 @@ def strength_weakness(area_scores: dict):
     return strength, weakness
 
 
+def transcript_context_for(query_text: str, videos: list, total: int = 55000) -> tuple[str, list]:
+    """Context from Pinecone (semantic retrieval) first, raw cached transcripts second."""
+    video_ids = [v["yt"] for v in videos if not v.get("playlist")]
+    try:
+        import vector_store
+        hits = vector_store.query_transcripts(query_text, video_ids=video_ids, top_k=10)
+        if hits:
+            text = "\n\n---\n\n".join(h["text"] for h in hits)[:total]
+            return text, list({h["video_id"] for h in hits})
+    except Exception as e:
+        print("vector transcript retrieval failed:", e)
+    import transcripts as ts
+    return ts.module_context(videos, total=total)
+
+
 def sunbird_envelope(result: dict) -> dict:
     return {
         "id": "api.content.search",
@@ -363,7 +378,8 @@ def roadmap_module_quiz(course_key: str, module_no: int, authorization: Optional
     context, fetched = [], []
     try:
         import transcripts as ts
-        context, fetched = ts.module_context(module["videos"])
+        query_text = f"{c['name']} — {module['title']}. Topics: {', '.join(c['areas'])}."
+        context, fetched = transcript_context_for(query_text, module["videos"])
     except Exception as e:
         print("transcript fetch failed:", e)
 
@@ -912,17 +928,12 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
             raise HTTPException(404, "Course not found in your roadmap")
     for c in courses:
         overlap = [a for a in c["areas"] if a in weak] or c["areas"]
-        for mi, m in enumerate(c["modules"], start=1):
-            try:
-                import transcripts as ts
-                ctx, vids = ts.module_context(m["videos"], total=60000)
-            except Exception:
-                ctx, vids = "", []
-            if ctx:
-                context, fetched, chosen = ctx, vids, {"course_key": c["key"], "module_no": mi, "title": m["title"]}
-                break
-        if context:
-            break
+        all_videos = [v for m in c["modules"] for v in m["videos"]]
+        ctx, vids = transcript_context_for(
+            f"Topics to assess: {', '.join(weak)}. Course: {c['name']}. {' '.join(c['areas'])}.", all_videos)
+        if ctx:
+            context, fetched = ctx, vids
+            chosen = {"course_key": c["key"], "module_no": 0, "title": c["name"] + " — weak-area retrieval"}
 
     questions, generator = [], "fallback"
     if context and llm.llm_available():
@@ -1063,7 +1074,9 @@ def lesson_quiz(course_key: str, module_no: int, video_no: int,
     if not video.get("playlist"):
         try:
             import transcripts as ts
-            ctx = ts.get_transcript(video["yt"])
+            vctx, vids = transcript_context_for(
+                f"{video['title']}. {c['name']}. {' '.join(c['areas'])}", [video], total=20000)
+            ctx = vctx
             context_ok = bool(ctx)
             if ctx and llm.llm_available():
                 from ontology import COMPETENCY_TYPE

@@ -15,21 +15,48 @@ def _fetch_video(video_id: str) -> str | None:
         return None
 
 
+def _index_to_vector_db(video_id: str, text: str) -> bool:
+    """One-time: embed + index a transcript into the vector DB so quiz
+    generation everywhere retrieves from Pinecone instead of re-fetching."""
+    try:
+        import vector_store
+        from materials import chunk_text
+        chunks = [c for c in chunk_text(text) if len(c.strip()) > 80]
+        if chunks:
+            n = vector_store.index_transcript(video_id, chunks)
+            print(f"transcript {video_id} indexed into Pinecone ({n} chunks)")
+            return True
+    except Exception as e:
+        print(f"transcript {video_id} vector indexing skipped:", e)
+    return False
+
+
 def get_transcript(video_id: str, max_chars: int = 24000) -> str:
-    """Cached transcript text for one video (head of the transcript)."""
+    """Cached transcript text for one video (head of the transcript).
+    Newly fetched AND previously-cached-but-unindexed transcripts get
+    indexed into the vector DB exactly once, at fetch/access time."""
     conn = get_db()
-    row = conn.execute("SELECT text FROM transcripts WHERE video_id=?", (video_id,)).fetchone()
+    row = conn.execute("SELECT text, indexed FROM transcripts WHERE video_id=?", (video_id,)).fetchone()
     conn.close()
     if row:
+        if not row["indexed"]:
+            if _index_to_vector_db(video_id, row["text"]):
+                conn = get_db()
+                conn.execute("UPDATE transcripts SET indexed=1 WHERE video_id=?", (video_id,))
+                conn.commit(); conn.close()
         return row["text"][:max_chars]
     text = _fetch_video(video_id)
     if not text:
         return ""
     conn = get_db()
-    conn.execute("INSERT OR REPLACE INTO transcripts (video_id, text, chars) VALUES (?,?,?)",
-                 (video_id, text, len(text)))
+    conn.execute("INSERT OR REPLACE INTO transcripts (video_id, text, chars, indexed) VALUES (?,?,?,?)",
+                 (video_id, text, len(text), 0))
     conn.commit()
     conn.close()
+    if _index_to_vector_db(video_id, text):
+        conn = get_db()
+        conn.execute("UPDATE transcripts SET indexed=1 WHERE video_id=?", (video_id,))
+        conn.commit(); conn.close()
     return text[:max_chars]
 
 

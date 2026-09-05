@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS transcripts (
     video_id TEXT PRIMARY KEY,
     text TEXT NOT NULL,
     chars INTEGER NOT NULL,
+    indexed INTEGER NOT NULL DEFAULT 0,   -- 1 once chunks are in the vector DB
     fetched_at TEXT DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS module_quizzes (
@@ -137,6 +138,10 @@ def get_db() -> sqlite3.Connection:
 def init_db():
     conn = get_db()
     conn.executescript(SCHEMA)
+    # lightweight migrations
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(transcripts)")]
+    if "indexed" not in cols:
+        conn.execute("ALTER TABLE transcripts ADD COLUMN indexed INTEGER NOT NULL DEFAULT 0")
     conn.execute(
         "INSERT OR IGNORE INTO users (name, email, password, designation, department) VALUES (?,?,?,?,?)",
         (DEMO_USER["name"], DEMO_USER["email"], DEMO_USER["password"],

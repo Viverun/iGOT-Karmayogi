@@ -105,3 +105,26 @@ def search_courses(query_text: str, top_k: int = 5) -> list:
     idx = get_index()
     res = idx.query(vector=qvec, top_k=top_k, namespace="courses", include_metadata=True)
     return [{"id": m["id"], "score": m["score"], **m["metadata"]} for m in res["matches"]]
+
+
+def index_transcript(video_id: str, chunks: list):
+    """Embed and store one lecture's transcript chunks in the 'transcripts' namespace."""
+    embeddings = embed(chunks)
+    vectors = [{
+        "id": f"vid{video_id}_c{i}",
+        "values": emb,
+        "metadata": {"video_id": video_id, "chunk_no": i, "text": c[:4000]},
+    } for i, (c, emb) in enumerate(zip(chunks, embeddings))]
+    upsert_chunks("transcripts", vectors)
+    return len(vectors)
+
+
+def query_transcripts(query_text: str, video_ids: list | None = None, top_k: int = 10) -> list:
+    """Retrieve transcript chunks, optionally restricted to specific lecture videos."""
+    qvec = embed([query_text])[0]
+    idx = get_index()
+    flt = {"video_id": {"$in": video_ids}} if video_ids else None
+    res = idx.query(vector=qvec, top_k=top_k, namespace="transcripts",
+                    filter=flt, include_metadata=True)
+    return [{"score": m["score"], "video_id": m["metadata"]["video_id"],
+             "text": m["metadata"]["text"]} for m in res["matches"]]
