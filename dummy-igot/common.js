@@ -2,7 +2,7 @@
 window.IGOT_API_BASE = window.IGOT_API_BASE ||
   (["localhost", "127.0.0.1"].includes(location.hostname)
     ? "http://localhost:8001"
-    : "https://igot-karmayogi-api.onrender.com");
+    : "https://igot-karmayogi-zs8h.onrender.com");
 const API = window.IGOT_API_BASE;
 
 function getToken() { return localStorage.getItem("igot_token"); }
