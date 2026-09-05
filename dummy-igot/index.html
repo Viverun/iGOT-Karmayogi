@@ -288,6 +288,7 @@
 <button class="fixed right-4 top-1/2 z-50 w-12 h-12 rounded-full bg-white border-2 border-blue-700 text-blue-700 shadow-lg" title="Accessibility options">♿</button>
 
 <script>
+const API_BASE = window.IGOT_API_BASE || (["localhost", "127.0.0.1"].includes(location.hostname) ? "http://localhost:8001" : "https://igot-karmayogi-api.onrender.com");
 /* ---------- Course cards ---------- */
 const courses = [
   { title: "Prevention of Sexual Harassment of Women at Workplace", by: "By Institute of Secretariat Training and Management", time: "1h 52m", emoji: "🤝", bg: "from-slate-700 to-slate-900" },
@@ -335,7 +336,7 @@ function agyCardHTML(c) {
 async function loadCourses() {
   const row = document.getElementById('courseRow');
   try {
-    const res = await fetch('http://localhost:8001/api/v1/content/search', {
+    const res = await fetch(`${API_BASE}/api/v1/content/search`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
     });
     const data = await res.json();
@@ -388,7 +389,7 @@ function welcomePrev() {
 async function enroll(courseId) {
   const token = localStorage.getItem('igot_token');
   if (!token) { location.href = 'login.html'; return; }
-  const res = await fetch('http://localhost:8001/api/enrollments', {
+  const res = await fetch(`${API_BASE}/api/enrollments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify({ course_id: courseId })

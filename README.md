@@ -70,3 +70,33 @@ The welcome popup + personalized roadmap unlock only after the 25-question asses
 - Ports: frontend 8090, backend 8001 (8000 is commonly occupied).
 - Keys live in `backend/.env` — never commit. Pinecone index auto-creates on first run.
 - For judges: reset with `rm backend/igot.db`, register the ISRO user, take the assessment, and the whole loop runs live (no manual seeding needed).
+
+## Deployment (Vercel frontend + Render backend)
+
+The frontend resolves its API base automatically: `localhost` → `http://localhost:8001`,
+any other hostname → `https://igot-karmayogi-api.onrender.com` (override by setting
+`window.IGOT_API_BASE` before page scripts, e.g. in a small config snippet).
+
+### Backend → Render
+1. Render dashboard → New → Blueprint → point at this repo (`render.yaml` is at the root).
+2. Fill in the `sync: false` env vars when prompted: `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `PINECONE_API_KEY`.
+3. Render builds with `requirements.txt`, starts `uvicorn main:app --host 0.0.0.0 --port $PORT`,
+   and health-checks `/api/health`. Auto-deploys on every push to `main`.
+   (If you use a different service name, update the fallback URL in `dummy-igot/common.js`.)
+
+### Frontend → Vercel
+1. Vercel → Add New Project → import the repo.
+2. Set **Root Directory** to `dummy-igot` (framework preset: Other — it's static).
+3. Deploy — `vercel.json` handles clean URLs + security headers. Auto-deploys on push to `main`.
+
+### CI/CD
+`.github/workflows/ci.yml` runs on every push/PR to `main`:
+- **backend job** — installs `requirements.txt` on Python 3.12, imports the app (catches route/model
+  definition errors), boots uvicorn and smoke-tests `/api/health` + catalogue search.
+- **frontend job** — verifies every page uses the `IGOT_API_BASE` resolver (no hardcoded localhost),
+  and all 9 pages exist.
+
+### Production caveat (intentional for the demo)
+Render's free tier has an **ephemeral disk** — `igot.db` (SQLite) resets on redeploy/restart, so the
+demo user/assessment data lives only between restarts. For a persistent demo, attach a Render Disk
+at `/opt/render/project/src/backend` or point `DB_PATH` at Postgres later.

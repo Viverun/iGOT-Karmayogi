@@ -1,5 +1,9 @@
 /* Shared helpers for the iGOT Karmayogi prototype frontend */
-const API = "http://localhost:8001";
+window.IGOT_API_BASE = window.IGOT_API_BASE ||
+  (["localhost", "127.0.0.1"].includes(location.hostname)
+    ? "http://localhost:8001"
+    : "https://igot-karmayogi-api.onrender.com");
+const API = window.IGOT_API_BASE;
 
 function getToken() { return localStorage.getItem("igot_token"); }
 function getUser() { return JSON.parse(localStorage.getItem("igot_user") || "null"); }

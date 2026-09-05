@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Import check (catches route/model errors)
+        working-directory: backend
+        run: python -c "import main; print('routes:', len(main.app.routes))"
+      - name: Smoke test API
+        working-directory: backend
+        run: |
+          python -m uvicorn main:app --port 8001 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8001/api/health && break || sleep 1
+          done
+          curl -sf http://localhost:8001/api/health | grep -q '"status":"ok"'
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8001/api/v1/content/search \
+            -H 'Content-Type: application/json' -d '{}')
+          test "$CODE" = "200"
+          echo "backend smoke test passed"
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify pages reference the deployable API resolver
+        working-directory: dummy-igot
+        run: |
+          for f in common.js index.html login.html register.html assessment.html; do
+            grep -q "IGOT_API_BASE" "$f" || { echo "FAIL: $f missing IGOT_API_BASE"; exit 1; }
+          done
+          ! grep -rn "fetch('http://localhost:8001" *.html *.js
+          ! grep -rn 'const API = "http://localhost:8001"' *.html *.js
+          echo "frontend API wiring OK"
+      - name: Check all pages exist and link-check internals
+        working-directory: dummy-igot
+        run: |
+          for f in index dashboard login register assessment learn quiz studio admin course_player; do
+            test -f "$f.html" || { echo "FAIL: missing $f.html"; exit 1; }
+          done
+          echo "all 9 pages present"

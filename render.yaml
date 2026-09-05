@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: igot-karmayogi-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      - key: OPENAI_API_KEY
+        sync: false          # set in Render dashboard (Azure OpenAI key)
+      - key: OPENAI_BASE_URL
+        sync: false          # e.g. https://<resource>.openai.azure.com/openai/v1
+      - key: LLM_MODEL
+        value: gpt-5-mini
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_INDEX
+        value: setu-stat
+      - key: CORS_ORIGINS
+        value: "*"
