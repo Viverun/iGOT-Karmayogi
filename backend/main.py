@@ -1102,7 +1102,7 @@ def lesson_quiz(course_key: str, module_no: int, video_no: int,
                       "question": q["text"], "level": "L2"} for q in qs]
 
     conn = get_db()
-    conn.execute("INSERT INTO lesson_quizzes (user_id, course_key, module_no, video_no, video_id, questions_json, generator) VALUES (?,?,?,?,?,?,?)",
+    conn.execute("INSERT OR REPLACE INTO lesson_quizzes (user_id, course_key, module_no, video_no, video_id, questions_json, generator) VALUES (?,?,?,?,?,?,?)",
                  (user_id, course_key, module_no, video_no, video["yt"], json.dumps(questions), generator))
     conn.commit()
     conn.close()
