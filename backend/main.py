@@ -357,8 +357,12 @@ def roadmap_module_quiz(course_key: str, module_no: int, authorization: Optional
             print("LLM module quiz failed:", e)
 
     if not questions:
+        # bank fallback: pick_questions strips answers for client serving, so
+        # re-attach the answer key from the bank before storing for grading
+        bank_full = {q["id"]: q for q in QUESTION_BANK[key]}
         qs = ge.pick_questions(QUESTION_BANK[key], c["areas"], n=5)
-        questions = [{**q, "question": q["text"], "level": "L2"} for q in qs]
+        questions = [{**q, **({"answer": bank_full[q["id"]]["answer"]} if q["id"] in bank_full else {}),
+                      "question": q["text"], "level": "L2"} for q in qs]
 
     conn = get_db()
     conn.execute("INSERT INTO module_quizzes (user_id, course_key, module_no, questions_json, generator) VALUES (?,?,?,?,?)",
@@ -367,7 +371,9 @@ def roadmap_module_quiz(course_key: str, module_no: int, authorization: Optional
     conn.close()
     return {"course_key": course_key, "module_no": module_no,
             "module_title": module["title"], "generator": generator,
-            "transcript_videos_used": len(fetched), "questions": questions}
+            "transcript_videos_used": len(fetched),
+            "questions": [{k: q[k] for k in ("id", "question", "options", "area", "level") if k in q}
+                          for q in questions]}
 
 
 @app.post("/api/roadmap/{course_key}/module/{module_no}/complete")
@@ -887,8 +893,10 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
             print("personalized generation failed:", e)
 
     if not questions:
+        bank_full = {q["id"]: q for q in QUESTION_BANK[key]}
         qs = ge.pick_questions(QUESTION_BANK[key], weak, n=body.n)
-        questions = [{**q, "question": q["text"], "level": "L2"} for q in qs]
+        questions = [{**q, **({"answer": bank_full[q["id"]]["answer"]} if q["id"] in bank_full else {}),
+                      "question": q["text"], "level": "L2"} for q in qs]
 
     conn = get_db()
     cur = conn.execute(
