@@ -241,9 +241,10 @@ if (requireAuth()) {
     });
     if (answers.some(a => a === null)) { alert("Answer all questions first."); return; }
     const r = await api(currentGradePath, { method: "POST", body: { answers } });
+    const sText = r.strength ? `💪 strength: <b>${r.strength}</b>` : "";
+    const wText = r.weakness ? `📌 weakness: <b>${r.weakness}</b>` : "";
     const memoryNote = r.readiness_pct !== undefined
-      ? `<p class="text-sm text-slate-500 mt-2">Saved to your learning profile · role readiness now <b>${r.readiness_pct}%</b> ·
-           💪 strength: <b>${r.strength}</b> · 📌 weakness: <b>${r.weakness}</b></p>` : "";
+      ? `<p class="text-sm text-slate-500 mt-2">Saved to your learning profile · role readiness now <b>${r.readiness_pct}%</b>${sText || wText ? " · " + [sText, wText].filter(Boolean).join(" · ") : " · perfect score 🎉"}</p>` : "";
     document.getElementById("gradeResult").innerHTML = `
       <div class="border-t border-slate-100 pt-4">
         <p class="text-3xl font-extrabold ${r.score >= 70 ? 'text-emerald-600' : r.score >= 40 ? 'text-amber-600' : 'text-red-600'}">${r.score}%</p>

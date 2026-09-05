@@ -41,6 +41,17 @@ app.add_middleware(
 )
 
 
+def strength_weakness(area_scores: dict):
+    """Weakness only exists if something was scored below 100; strength only if something scored above 0."""
+    if not area_scores:
+        return None, None
+    smax = max(area_scores, key=area_scores.get)
+    smin = min(area_scores, key=area_scores.get)
+    strength = smax if area_scores[smax] > 0 else None
+    weakness = smin if area_scores[smin] < 100 else None
+    return strength, weakness
+
+
 def sunbird_envelope(result: dict) -> dict:
     return {
         "id": "api.content.search",
@@ -458,17 +469,17 @@ def roadmap_module_complete(course_key: str, module_no: int, body: ChapterComple
 
     # persistent memory: module strengths/weaknesses feed the same competency vector
     ge.update_competency(user_id, area_scores)
+    s_w = strength_weakness(area_scores)
     ge.log_event(user_id, "module_quiz_completed",
                  {"course_key": course_key, "module_no": module_no, "score": score,
-                  "areas": list(area_scores), "strength": max(area_scores, key=area_scores.get),
-                  "weakness": min(area_scores, key=area_scores.get)})
+                  "areas": list(area_scores), "strength": s_w[0], "weakness": s_w[1]})
     _, key = _user_department(user_id)
     gaps = ge.compute_gaps(user_id, key)
     ge.build_roadmap(user_id, key, COURSES, gaps, completed_ids=_completed_ids(user_id))
 
+    strength, weakness = strength_weakness(area_scores)
     return {"module_score": score, "area_scores": area_scores,
-            "strength": max(area_scores, key=area_scores.get),
-            "weakness": min(area_scores, key=area_scores.get),
+            "strength": strength, "weakness": weakness,
             "course_progress_pct": round(100 * done / len(c["modules"])),
             "readiness_pct": gaps["readiness_pct"]}
 
@@ -1007,16 +1018,16 @@ def personalized_grade(quiz_id: int, body: QuizSubmitBody, authorization: Option
 
     # straight into persistent memory — same EWMA merge as everything else
     ge.update_competency(user_id, area_scores)
+    s_w = strength_weakness(area_scores)
     ge.log_event(user_id, "personalized_quiz_taken",
                  {"quiz_id": quiz_id, "score": score, "areas": list(area_scores),
-                  "strength": max(area_scores, key=area_scores.get),
-                  "weakness": min(area_scores, key=area_scores.get)})
+                  "strength": s_w[0], "weakness": s_w[1]})
     _, key = _user_department(user_id)
     gaps = ge.compute_gaps(user_id, key)
     ge.build_roadmap(user_id, key, COURSES, gaps, completed_ids=_completed_ids(user_id))
+    strength, weakness = strength_weakness(area_scores)
     return {"score": score, "area_scores": area_scores,
-            "strength": max(area_scores, key=area_scores.get),
-            "weakness": min(area_scores, key=area_scores.get),
+            "strength": strength, "weakness": weakness,
             "readiness_pct": gaps["readiness_pct"], "results": results}
 
 
@@ -1128,16 +1139,16 @@ def lesson_quiz_complete(course_key: str, module_no: int, video_no: int, body: C
     area_scores = {area: round(100 * v["correct"] / v["total"]) for area, v in per_area.items()}
 
     ge.update_competency(user_id, area_scores)
+    s_w = strength_weakness(area_scores)
     ge.log_event(user_id, "lesson_quiz_completed",
                  {"course_key": course_key, "module_no": module_no, "video_no": video_no,
-                  "score": score, "strength": max(area_scores, key=area_scores.get),
-                  "weakness": min(area_scores, key=area_scores.get)})
+                  "score": score, "strength": s_w[0], "weakness": s_w[1]})
     _, key = _user_department(user_id)
     gaps = ge.compute_gaps(user_id, key)
     ge.build_roadmap(user_id, key, COURSES, gaps, completed_ids=_completed_ids(user_id))
+    strength, weakness = strength_weakness(area_scores)
     return {"lesson_score": score, "area_scores": area_scores,
-            "strength": max(area_scores, key=area_scores.get),
-            "weakness": min(area_scores, key=area_scores.get),
+            "strength": strength, "weakness": weakness,
             "readiness_pct": gaps["readiness_pct"]}
 
 
