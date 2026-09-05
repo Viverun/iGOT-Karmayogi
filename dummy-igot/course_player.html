@@ -104,7 +104,21 @@ if (requireAuth()) {
     const s = doneSet(); s.add(playingLesson.id); saveDone(s);
     document.getElementById("markBtn").textContent = "✓ Completed";
     document.getElementById("markBtn").disabled = true;
+    const tick = document.querySelector(`[data-done="${playingLesson.id}"]`);
+    if (tick) tick.classList.remove("hidden");
     refreshModuleBadges();
+    // auto-advance to the next unmarked lesson in the same module
+    const { mi, vi } = playingLesson;
+    const videos = currentCourse.modules[mi].videos;
+    for (let j = vi + 1; j < videos.length; j++) {
+      if (!s.has(lessonId(mi, j))) {
+        const row = document.querySelectorAll(`#mb${mi} .video-row`)[j];
+        if (row) row.click();
+        return;
+      }
+    }
+    // module finished — scroll to its quiz button
+    document.getElementById("mq" + mi)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
   window.markLessonDone = markLessonDone;
 
@@ -123,10 +137,12 @@ if (requireAuth()) {
         el.outerHTML = `<div id="mq${mi}" class="text-center py-2 text-sm">
           <span class="text-emerald-700 font-semibold">✔ Module completed — ${currentCourse.completed_modules[String(mi + 1)]}%</span></div>`;
       } else {
+        const doneCount = m.videos.filter((_, vi) => doneSet().has(lessonId(mi, vi))).length;
         el.disabled = !ready;
         el.className = "w-full py-2 rounded-full text-sm font-semibold " +
           (ready ? "bg-orange-400 text-white hover:bg-orange-500" : "bg-slate-100 text-slate-400 cursor-not-allowed");
-        el.textContent = ready ? "📝 Take Module Quiz (5 questions)" : "Complete all lessons to unlock quiz";
+        el.textContent = ready ? "📝 Take Module Quiz (5 questions)"
+          : `🔒 Mark all lessons complete (${doneCount}/${m.videos.length}) to unlock quiz`;
       }
     });
   }
