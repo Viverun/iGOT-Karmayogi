@@ -21,6 +21,18 @@ def chunk_text(text: str, size: int = 1200) -> list:
     chunks, buf = [], []
     length = 0
     for para in re.split(r"\n\s*\n", text):
+        # split oversized paragraphs (e.g. one-line transcripts) by words
+        while len(para) > size:
+            cut = para.rfind(" ", int(size * 0.8), size)
+            cut = cut if cut > 0 else size
+            piece, para = para[:cut].strip(), para[cut:].strip()
+            if length + len(piece) > size and buf:
+                chunks.append("\n\n".join(buf))
+                buf, length = [], 0
+            buf.append(piece)
+            length += len(piece)
+        if not para:
+            continue
         if length + len(para) > size and buf:
             chunks.append("\n\n".join(buf))
             buf, length = [], 0

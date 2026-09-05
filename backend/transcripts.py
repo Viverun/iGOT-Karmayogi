@@ -33,17 +33,32 @@ def _fetch_via_supadata(video_id: str) -> str | None:
             print(f"supadata {video_id}: HTTP {r.status_code}")
             return None
         d = r.json()
-        return d.get("content") or None
+        content = d.get("content")
+        if isinstance(content, list):  # timestamped chunks -> plain text
+            content = " ".join(c.get("text", "") if isinstance(c, dict) else str(c) for c in content)
+        return (content or "").strip() or None
     except Exception as e:
         print(f"supadata {video_id} failed:", e)
         return None
 
 
+def _yt_api():
+    """Transcript API client with a hard 45s HTTP timeout (proxies can hang)."""
+    import requests
+    from youtube_transcript_api import YouTubeTranscriptApi
+
+    class _TimeoutSession(requests.Session):
+        def request(self, *a, **kw):
+            kw.setdefault("timeout", 45)
+            return super().request(*a, **kw)
+
+    return YouTubeTranscriptApi(proxy_config=_proxy_config(), http_client=_TimeoutSession())
+
+
 def _fetch_video(video_id: str) -> str | None:
     # 1. direct fetch (works locally / with TRANSCRIPT_PROXY)
     try:
-        from youtube_transcript_api import YouTubeTranscriptApi
-        api = YouTubeTranscriptApi(proxy_config=_proxy_config())
+        api = _yt_api()
         try:
             t = api.fetch(video_id, languages=["en"])
         except Exception:

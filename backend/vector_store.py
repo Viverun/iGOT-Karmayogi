@@ -23,21 +23,44 @@ _index = None
 
 
 def _embed_azure(texts: list) -> list:
+    """Embeds in batches — Azure caps the total input per request (~8k tokens)."""
     key, base = get_openai_auth()
-    resp = httpx.post(
-        f"{base}/embeddings",
-        headers={"Authorization": f"Bearer {key}", "content-type": "application/json"},
-        json={"model": EMBED_MODEL, "input": texts},
-        timeout=60,
-    )
-    resp.raise_for_status()
-    return [d["embedding"] for d in resp.json()["data"]]
+    out = []
+    BATCH = 16  # ~16 x 1200-char chunks stays well under the token cap
+    for i in range(0, len(texts), BATCH):
+        batch = texts[i:i + BATCH]
+        resp = httpx.post(
+            f"{base}/embeddings",
+            headers={"Authorization": f"Bearer {key}", "content-type": "application/json"},
+            json={"model": EMBED_MODEL, "input": batch},
+            timeout=60,
+        )
+        resp.raise_for_status()
+        out.extend(d["embedding"] for d in resp.json()["data"])
+    return out
 
 
 def embed(texts: list) -> list:
+    """Embed with retry/backoff for Azure rate limits (429)."""
+    import time
     if isinstance(texts, str):
         texts = [texts]
-    return _embed_azure(texts)
+    texts = [t for t in texts if t and t.strip()]  # guard empty inputs
+    if not texts:
+        return []
+    last = None
+    for attempt in range(6):
+        try:
+            return _embed_azure(texts)
+        except httpx.HTTPStatusError as e:
+            last = e
+            if e.response.status_code in (429, 500, 503):
+                wait = min(60, 3 * (2 ** attempt))
+                print(f"embed rate-limited, retrying in {wait}s (attempt {attempt + 1})")
+                time.sleep(wait)
+            else:
+                raise
+    raise last
 
 
 def get_index():
