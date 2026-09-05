@@ -16,10 +16,31 @@ def _proxy_config():
     if not proxy_url:
         return None
     from youtube_transcript_api.proxies import GenericProxyConfig
-    return GenericProxyConfig(proxy_url=proxy_url)
+    return GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
+
+
+def _fetch_via_supadata(video_id: str) -> str | None:
+    """Transcript-API service (works from any cloud host; SUPADATA_API_KEY env)."""
+    key = os.environ.get("SUPADATA_API_KEY")
+    if not key:
+        return None
+    try:
+        import httpx
+        r = httpx.get("https://api.supadata.ai/v1/youtube/transcript",
+                      params={"videoId": video_id},
+                      headers={"x-api-key": key}, timeout=60)
+        if r.status_code != 200:
+            print(f"supadata {video_id}: HTTP {r.status_code}")
+            return None
+        d = r.json()
+        return d.get("content") or None
+    except Exception as e:
+        print(f"supadata {video_id} failed:", e)
+        return None
 
 
 def _fetch_video(video_id: str) -> str | None:
+    # 1. direct fetch (works locally / with TRANSCRIPT_PROXY)
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
         api = YouTubeTranscriptApi(proxy_config=_proxy_config())
@@ -29,7 +50,9 @@ def _fetch_video(video_id: str) -> str | None:
             t = api.fetch(video_id)  # any available language / auto-generated
         return " ".join(s.text.replace("\n", " ") for s in t)
     except Exception:
-        return None
+        pass
+    # 2. transcript API service (works from Render/cloud)
+    return _fetch_via_supadata(video_id)
 
 
 def _index_to_vector_db(video_id: str, text: str) -> bool:
