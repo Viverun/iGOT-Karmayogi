@@ -72,16 +72,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Deploy to Vercel (production)
-        working-directory: dummy-igot
+      - name: Deploy to Vercel (production, from repo root — project Root Directory = dummy-igot)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          npx --yes vercel@59 deploy --prod --yes \
-            --token "$VERCEL_TOKEN" \
-            --cwd "$(pwd)"
+          npx --yes vercel@59 deploy --prod --yes --token "$VERCEL_TOKEN"
           echo "✓ deployed to https://igot-karmayogi.vercel.app"
 
   deploy-backend:
