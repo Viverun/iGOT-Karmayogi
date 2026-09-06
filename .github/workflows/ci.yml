@@ -68,15 +68,17 @@ jobs:
     needs: [backend, frontend]
     runs-on: ubuntu-latest
     steps:
-      - name: Wait for Vercel git auto-deploy and verify production is live
+      - name: Deploy to Vercel (production)
+        working-directory: dummy-igot
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          echo "Vercel auto-deploys this push (Root Directory: dummy-igot). Waiting for it to go live…"
-          for i in $(seq 1 60); do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" https://igot-karmayogi.vercel.app/dashboard)
-            if [ "$CODE" = "200" ]; then echo "✓ production live at https://igot-karmayogi.vercel.app"; exit 0; fi
-            sleep 10
-          done
-          echo "✗ production did not come up in time"; exit 1
+          npx --yes vercel@59 deploy --prod --yes \
+            --token "$VERCEL_TOKEN" \
+            --cwd "$(pwd)"
+          echo "✓ deployed to https://igot-karmayogi.vercel.app"
 
   deploy-backend:
     name: CD · Deploy backend → Render
