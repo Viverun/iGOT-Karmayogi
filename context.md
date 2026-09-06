@@ -127,6 +127,28 @@ Full research/architecture: `docs/plan-of-action.md` and
     every 5 min) so Render never sleeps.
 15. **Final verification sweep**: 24/24 API end-to-end checks green on production;
     all 10 pages 200 with no JS errors/overflow; CI/CD green; favicon + logo live.
+16. **MoSPI domain layer** (phase from the reference prototype in `docs/iGOT_karmayogi/`):
+    - `backend/ontology.py` extended with the 9 PS-named statistical competencies
+      (National Accounts, Price/Labour/Agricultural/Industrial Statistics, SDG
+      Indicators, Metadata Standards, Data Quality Frameworks) and 6 standard
+      MoSPI **role profiles** (JSO-FOD, SSO-PSD, Director-NAD, JD-SDRD, DD-Computer
+      Centre, SO-Labour Bureau). A matching role overrides the department target
+      profile; role is auto-resolved from designation/department keywords
+      (`resolve_role_id`), exposed on `/api/dashboard` as `profile.role_id`.
+    - `backend/tpac_data.py`: NSSTA **TPAC-recommended training programmes**
+      (cadre ISS/SSS/Both) ranked against measured gaps → `GET /api/tpac/pathways`;
+      rendered as an emerald strip on the dashboard under the roadmap (PS asks for
+      TPAC recommendations explicitly).
+    - New endpoints: `GET /api/taxonomy` (4 FRAC pillars), `GET /api/roles`,
+      `GET /api/materials` (user uploads + shared library).
+    - **Explainable recommendations**: roadmap `reasons` now cite measured/target
+      numbers ("Sampling Techniques: measured 0/100 against target 75/100 — closes
+      a 75-point gap (Domain competency)").
+    - **NSSTA/MoSPI manual library**: 3 real manuals (CPI compilation SOP, National
+      Accounts GVA, NSSO survey methodology) in `backend/data/mospi/`, seeded at
+      startup as shared `user_id=0` rows (system user id 0 created to satisfy FK);
+      Trainer Studio has a library picker beside the upload (selecting a manual also
+      arms the "generate quiz from material" button).
 
 ---
 
