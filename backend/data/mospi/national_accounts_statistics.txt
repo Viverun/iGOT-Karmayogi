@@ -1,0 +1,28 @@
+MINISTRY OF STATISTICS AND PROGRAMME IMPLEMENTATION
+NATIONAL ACCOUNTS DIVISION (NAD)
+METHODOLOGICAL NOTE ON BASE REVISION AND GROSS VALUE ADDED (GVA) COMPILATION UNDER SNA 2008
+
+1. CONCEPTUAL FRAMEWORK AND PRODUCTION BOUNDARY
+The compilation of national accounting aggregates conforms to the United Nations System of National Accounts 2008 (2008 SNA). Production is understood as an activity carried out under the control and responsibility of an institutional unit that uses inputs of labour, capital, and goods and services to produce outputs of goods or services. Illegal or informal activities that produce genuine economic value are conceptually included within the production boundary.
+
+2. GROSS VALUE ADDED (GVA) AT BASIC PRICES
+Gross Value Added (GVA) at basic prices is defined as total output valued at basic prices less intermediate consumption valued at purchasers' prices.
+Mathematical formulation:
+GVA at basic prices = Gross Output at Basic Prices - Intermediate Consumption at Purchasers' Prices.
+To arrive at Gross Domestic Product (GDP) at market prices:
+GDP at Market Prices = GVA at Basic Prices + Product Taxes - Product Subsidies.
+Product taxes include GST, custom duties, excise stamps, and registration fees, while production taxes (e.g. land revenue, stamp duties on corporate registrations) are already netted into basic prices.
+
+3. FINANCIAL INTERMEDIATION SERVICES INDIRECTLY MEASURED (FISIM)
+Financial intermediaries provide services for which they do not charge explicit fees, instead earning a margin between interest charged on loans and interest paid on deposits. FISIM is estimated using a reference rate of interest representing a pure cost of borrowing devoid of credit risk and service margins:
+FISIM on Loans = (Loan Interest Rate - Reference Rate) * Stock of Loans
+FISIM on Deposits = (Reference Rate - Deposit Interest Rate) * Stock of Deposits
+Total FISIM is allocated across intermediate consumption of user industries and final household consumption based on sectoral deposit-credit shares.
+
+4. CONSTANT PRICE ESTIMATION AND DEFLATION METHODOLOGY
+Volume estimates of GVA require separating price inflation from true physical output growth.
+- Double Deflation: Methodologically superior approach where gross output is deflated by an output price index (e.g., WPI or PPI) and intermediate consumption is independently deflated by a tailored input cost index.
+- Single Extrapolation / Single Deflation: In service sub-sectors lacking input-output cost trackers, real GVA is extrapolated using physical volume indicators (e.g., passenger-kilometers, handled port tonnage, registered bank accounts) or deflated by a consumer price index for services.
+
+5. CAPITAL FORMATION AND CONSUMPTION OF FIXED CAPITAL (CFC)
+Gross Fixed Capital Formation (GFCF) comprises resident producers' acquisitions less disposals of fixed assets (machinery, construction, IP products, cultivated biological assets). Consumption of Fixed Capital (CFC) reflects the decline in current value of the stock of fixed assets resulting from physical deterioration, normal obsolescence, or accidental damage, computed through the Perpetual Inventory Method (PIM).

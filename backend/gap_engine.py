@@ -12,7 +12,7 @@ import json
 import random
 
 from db import get_db
-from ontology import target_profile, area_type, CHAPTER_TITLES, DEFAULT_TARGET
+from ontology import target_profile, area_type, CHAPTER_TITLES, DEFAULT_TARGET, ROLE_PROFILES, role_profile
 
 # Bloom-ish difficulty ordering for prerequisite sequencing
 LEVEL_ORDER = {"Basic": 0, "Intermediate": 1, "Advanced": 2}
@@ -41,9 +41,9 @@ def log_event(user_id: int, etype: str, detail: dict):
     conn.close()
 
 
-def competency_vector(user_id: int, department_key: str) -> list:
+def competency_vector(user_id: int, department_key: str, role_id: str | None = None) -> list:
     """Current vector (assessment + quizzes + completed-course boosts) vs targets."""
-    targets = target_profile(department_key)
+    targets = target_profile(department_key, role_id)
     conn = get_db()
     rows = conn.execute("SELECT area, score FROM user_competency WHERE user_id=?", (user_id,)).fetchall()
     completed = [r["course_id"] for r in conn.execute(
@@ -86,8 +86,8 @@ def _verified_course_completions(user_id: int) -> int:
                if r["course_id"] in completed and r["avg_score"] is not None and r["avg_score"] >= 60)
 
 
-def compute_gaps(user_id: int, department_key: str) -> dict:
-    vector = competency_vector(user_id, department_key)
+def compute_gaps(user_id: int, department_key: str, role_id: str | None = None) -> dict:
+    vector = competency_vector(user_id, department_key, role_id)
     scored = [v for v in vector if v["target"] > 0]
 
     # evidence-based readiness:
@@ -106,8 +106,11 @@ def compute_gaps(user_id: int, department_key: str) -> dict:
     overall_target = round(sum(v["target"] for v in scored) / max(1, len(scored)), 1)
     gaps = sorted(scored, key=lambda v: v["gap"], reverse=True)
     worst = [g for g in gaps if g["gap"] > 0]
+    role_note = ""
+    if role_id and role_id in ROLE_PROFILES:
+        role_note = f" for role '{ROLE_PROFILES[role_id]['title']}'"
     explanations = [
-        f"{g['area']}: current {g['current']}/100 vs role target {g['target']}/100 — "
+        f"{g['area']}: current {g['current']}/100 vs target {g['target']}/100{role_note} — "
         f"gap of {g['gap']} points ({g['type']} competency)."
         for g in worst[:5]
     ]
@@ -149,7 +152,12 @@ def build_roadmap(user_id: int, department_key: str, courses: list, gaps: dict,
                            and LEVEL_ORDER[x["level"]] < LEVEL_ORDER[c["level"]]
                            and a in course_areas(x) for x in courses):
                     prereq_penalty += 10
-        reasons = [f"Closes '{a}' (gap {severity[a]:.0f} pts)" for a in overlap]
+        cur = {g["area"]: g for g in gaps["vector"]}
+        reasons = [
+            (f"{a}: measured {cur[a]['current']:.0f}/100 against target {cur[a]['target']}/100 — "
+             f"closes a {severity[a]:.0f}-point gap ({cur[a]['type']} competency)")
+            for a in overlap
+        ]
         scored_courses.append((weight - prereq_penalty, c, reasons))
 
     scored_courses.sort(key=lambda t: t[0], reverse=True)

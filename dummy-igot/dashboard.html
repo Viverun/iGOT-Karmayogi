@@ -203,6 +203,32 @@ if (requireAuth()) {
             </div>
           </div>`).join("");
       }
+      // NSSTA TPAC-recommended training programmes (cadre-approved pathways)
+      try {
+        const tp = await api("/api/tpac/pathways");
+        if (tp.pathways && tp.pathways.length) {
+          area.insertAdjacentHTML("beforeend", `
+            <div class="mt-6 mb-2 flex items-center gap-2">
+              <h3 class="font-bold text-[#1a3a6b]">🏛️ NSSTA TPAC Recommended</h3>
+              <span class="text-xs text-slate-400">cadre-approved training programmes (ISS / SSS)</span>
+            </div>` +
+            tp.pathways.map((p, i) => `
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-3 hover:shadow-md transition-shadow">
+              <div class="flex items-stretch">
+                <div class="w-2 bg-gradient-to-b from-emerald-600 to-teal-400"></div>
+                <div class="p-4 flex-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">${p.badge}</span>
+                    <span class="text-xs text-slate-400">#${i + 1} · ${p.level} · ~${p.hours}h · ${p.provider}</span>
+                    ${p.gap_points > 0 ? `<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">closes a ${Math.round(p.gap_points)}-pt gap</span>` : ""}
+                  </div>
+                  <h4 class="mt-1 font-bold text-[#1a3a6b] text-sm">${p.name}</h4>
+                  <p class="text-sm text-slate-500 mt-1">${p.description}</p>
+                </div>
+              </div>
+            </div>`).join(""));
+        }
+      } catch (e) { /* TPAC strip is non-critical */ }
     }
 
     // continue learning

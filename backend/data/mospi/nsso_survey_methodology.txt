@@ -1,0 +1,24 @@
+NATIONAL STATISTICAL OFFICE (NSO)
+SURVEY DESIGN AND RESEARCH DIVISION (SDRD) & FIELD OPERATIONS DIVISION (FOD)
+INSTRUCTIONS TO FIELD STAFF: MULTI-STAGE STRATIFIED SAMPLING AND CAPI SURVEY PROTOCOLS
+
+1. SAMPLING DESIGN AND GENERAL APPROACH
+The National Sample Survey (NSS) adopts a stratified two-stage design for socio-economic inquiries. The First Stage Units (FSUs) are Census villages (Panchayat wards in rural areas) and Urban Frame Survey (UFS) blocks in urban areas. The Ultimate Stage Units (USUs) are households in both sectors. For the selection of FSUs, Probability Proportional to Size with Replacement (PPSWR) is utilized where size is the population as per the latest decennial Census.
+
+2. STRATIFICATION AND SUB-STRATIFICATION
+Each district is generally treated as a basic stratum. In rural sectors, if district population exceeds 2.5 million, it is divided into two or more strata by grouping contiguous tehsils. In urban areas, towns are stratified based on population size classes. Within each stratum, non-agricultural enterprise density and SC/ST population percentages serve as criteria for sub-stratification.
+
+3. SELECTION OF SECOND STAGE UNITS (HOUSEHOLDS)
+From each selected FSU, after completing listing Schedule 0.0, households are categorized into Second Stage Strata (SSS) based on household consumer expenditure and educational attainment of female members. Within each SSS, households are selected by Circular Systematic Sampling (CSS) without replacement. The sampling interval 'k' is calculated as N/n, where N is total eligible households and n is target sample size. A random start 'R' between 1 and k is chosen using a verified pseudo-random generator.
+
+4. COMPUTER-ASSISTED PERSONAL INTERVIEWING (CAPI) PROTOCOLS
+Field officers (Junior Statistical Officers) must administer Schedule 10.4 through encrypted CAPI tablets. The protocol mandates:
+a) Geolocation Capture: Automatic GPS coordinate locking at the threshold of the sample dwelling before initiating the roster.
+b) Logical Consistency Audits: Hard and soft validation rules are embedded in the CAPI client. Soft errors (e.g., individual monthly expenditure exceeding Rs. 1,00,000 in rural decile) require mandatory supervisory remarks. Hard errors (e.g., age of mother being less than 13 years older than biological child) strictly prevent form progression.
+c) Multi-Visit Requirement: If an informant is unavailable, the JSO must make at least three independent visits at different times of the day before classifying the unit as a non-response/casualty.
+
+5. NON-SAMPLING ERROR MITIGATION AND SUPERVISION
+Non-sampling errors arising from recall decay, respondent fatigue, and investigator bias are mitigated through:
+- Dual-independent re-listing of 10% of hamlet groups by the Senior Statistical Officer (SSO).
+- Scrubbing of outliers using statistical z-scores on per capita consumption aggregates.
+- Direct digital audit trail logging keystrokes, item interview duration, and schedule timestamp delta.

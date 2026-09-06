@@ -516,7 +516,7 @@ def roadmap_module_complete(course_key: str, module_no: int, body: ChapterComple
                  {"course_key": course_key, "module_no": module_no, "score": score,
                   "areas": list(area_scores), "strength": s_w[0], "weakness": s_w[1]})
     _, key = _user_department(user_id)
-    gaps = ge.compute_gaps(user_id, key)
+    gaps = ge.compute_gaps(user_id, key, _user_context(user_id)[2])
     ge.build_roadmap(user_id, key, COURSES, gaps, completed_ids=_completed_ids(user_id))
 
     strength, weakness = strength_weakness(area_scores)
@@ -539,6 +539,35 @@ def startup_indexing():
         print(f"course catalogue indexed into Pinecone ({n} vectors)")
     except Exception as e:
         print("Pinecone course indexing skipped:", e)
+    _seed_mospi_library()
+
+
+def _seed_mospi_library():
+    """Pre-load official NSSTA/MoSPI manuals into the Trainer Studio library
+    (shared rows with user_id=0) so MCQ generation can be demoed instantly."""
+    import os
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "mospi")
+    if not os.path.isdir(data_dir):
+        return
+    conn = get_db()
+    # shared-library system user (id=0) so FK constraints hold
+    conn.execute("INSERT OR IGNORE INTO users (id, name, email, password, designation, department) "
+                 "VALUES (0, 'NSSTA Training Library', 'library@nssta.gov.in', '-', 'Library', 'NSSTA / MoSPI')")
+    seeded = 0
+    for fn in sorted(os.listdir(data_dir)):
+        if not fn.endswith(".txt"):
+            continue
+        exists = conn.execute("SELECT id FROM materials WHERE filename=? AND user_id=0",
+                              (fn,)).fetchone()
+        if exists:
+            continue
+        text = open(os.path.join(data_dir, fn), encoding="utf-8", errors="ignore").read()
+        conn.execute("INSERT INTO materials (user_id, filename, text) VALUES (0, ?, ?)", (fn, text))
+        seeded += 1
+    conn.commit()
+    conn.close()
+    if seeded:
+        print(f"seeded {seeded} NSSTA/MoSPI manuals into the material library")
 
 
 # ---------- Assessment (department-aware, scored server-side) ----------
@@ -597,7 +626,7 @@ def assessment_submit(body: SubmitBody, authorization: Optional[str] = Header(No
     # Persistent memory: merge scores, log the event, refresh the roadmap.
     ge.update_competency(user_id, scores)
     ge.log_event(user_id, "assessed", {"department_key": key, "overall": overall})
-    gaps = ge.compute_gaps(user_id, key)
+    gaps = ge.compute_gaps(user_id, key, _user_context(user_id)[2])
     roadmap = ge.build_roadmap(user_id, key, COURSES, gaps,
                                completed_ids=_completed_ids(user_id))
     return {"overall": overall, "scores": scores, "answers": graded,
@@ -605,11 +634,20 @@ def assessment_submit(body: SubmitBody, authorization: Optional[str] = Header(No
 
 
 def _user_department(user_id: int) -> tuple[str, str]:
+    dept, key, _ = _user_context(user_id)
+    return dept, key
+
+
+def _user_context(user_id: int) -> tuple[str, str, str | None]:
+    """(department, department_key, role_id) — role_id maps designation/department
+    to a standard MoSPI role profile when one matches."""
     conn = get_db()
-    row = conn.execute("SELECT department FROM users WHERE id = ?", (user_id,)).fetchone()
+    row = conn.execute("SELECT designation, department FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
-    dept = row["department"] if row else ""
-    return dept, department_key(dept)
+    dept = (row["department"] if row else "") or ""
+    desig = (row["designation"] if row else "") or ""
+    from ontology import resolve_role_id
+    return dept, department_key(dept), resolve_role_id(desig, dept)
 
 
 def _completed_ids(user_id: int) -> set:
@@ -625,8 +663,8 @@ def _completed_ids(user_id: int) -> set:
 @app.get("/api/dashboard")
 def dashboard(authorization: Optional[str] = Header(None)):
     user_id = require_user(authorization)
-    dept, key = _user_department(user_id)
-    gaps = ge.compute_gaps(user_id, key)
+    dept, key, role_id = _user_context(user_id)
+    gaps = ge.compute_gaps(user_id, key, role_id)
     roadmap_row = get_db().execute("SELECT data_json FROM roadmaps WHERE user_id=?", (user_id,)).fetchone()
     conn = get_db()
     profile = conn.execute("SELECT name, email, designation, department FROM users WHERE id=?",
@@ -644,7 +682,7 @@ def dashboard(authorization: Optional[str] = Header(None)):
         "SELECT COUNT(*) AS n FROM assessment_results WHERE user_id=?", (user_id,)).fetchone()["n"] > 0
     conn.close()
     return {
-        "profile": dict(profile),
+        "profile": {**dict(profile), "role_id": role_id},
         "assessment_done": assessment_done,
         "competency_vector": gaps["vector"],
         "overall_current": gaps["overall_current"],
@@ -659,6 +697,43 @@ def dashboard(authorization: Optional[str] = Header(None)):
         "learning_hours": learning_hours,
     }
 
+
+# ---------- NSSTA TPAC pathways, competency taxonomy & standard roles ----------
+
+@app.get("/api/tpac/pathways")
+def tpac_pathways(authorization: Optional[str] = Header(None)):
+    """NSSTA TPAC-recommended training programmes, ranked against measured gaps."""
+    user_id = require_user(authorization)
+    _, key, role_id = _user_context(user_id)
+    gaps = ge.compute_gaps(user_id, key, role_id)
+    import tpac_data
+    pathways = tpac_data.get_tpac_pathways(key, gaps["top_gaps"])
+    gap_by_area = {g["area"]: g["gap"] for g in gaps["top_gaps"]}
+    return {"pathways": [{**p, "gap_points": round(max((gap_by_area.get(a, 0) for a in p["areas"]), default=0))}
+                         for p in pathways]}
+
+
+@app.get("/api/taxonomy")
+def get_taxonomy():
+    """FRAC-flavoured competency taxonomy (the 4 MoSPI pillars)."""
+    from ontology import COMPETENCY_TYPE
+    pillars = {"Domain": "Statistical & Domain Competencies",
+               "Functional": "Technical Competencies",
+               "Behavioural": "Behavioural & Managerial Competencies",
+               "Digital Governance": "Digital Governance"}
+    out = {}
+    for area, t in COMPETENCY_TYPE.items():
+        out.setdefault(t, []).append(area)
+    return {"pillars": [{"type": t, "label": pillars.get(t, t), "areas": sorted(areas)}
+                        for t, areas in out.items()]}
+
+
+@app.get("/api/roles")
+def get_roles():
+    """Standard MoSPI job roles with their target competency baselines."""
+    from ontology import ROLE_PROFILES
+    return {"roles": [{"role_id": rid, **{k: v for k, v in r.items() if k != "targets"},
+                       "target_areas": len(r["targets"])} for rid, r in ROLE_PROFILES.items()]}
 
 # ---------- Chapters & chapter quizzes ----------
 
@@ -737,7 +812,7 @@ def chapter_complete(course_id: str, chapter_no: int, body: ChapterCompleteBody,
     if pct >= 100:
         ge.log_event(user_id, "course_completed", {"course_id": course_id})
         # course completion closes the loop: refresh gaps + roadmap
-        gaps = ge.compute_gaps(user_id, key)
+        gaps = ge.compute_gaps(user_id, key, _user_context(user_id)[2])
         ge.build_roadmap(user_id, key, COURSES, gaps, completed_ids=_completed_ids(user_id))
 
     return {"chapter_score": score, "course_progress_pct": pct,
@@ -792,7 +867,7 @@ def personalized_quiz_submit(body: QuizSubmitBody, authorization: Optional[str] 
     scores = {area: round(100 * v["correct"] / v["total"]) for area, v in per_area.items()}
     ge.update_competency(user_id, scores)
     ge.log_event(user_id, "quiz_taken", {"scores": scores})
-    gaps = ge.compute_gaps(user_id, key)
+    gaps = ge.compute_gaps(user_id, key, _user_context(user_id)[2])
     ge.build_roadmap(user_id, key, COURSES, gaps, completed_ids=_completed_ids(user_id))
     return {"scores": scores, "results": results, "readiness_pct": gaps["readiness_pct"]}
 
@@ -800,6 +875,18 @@ def personalized_quiz_submit(body: QuizSubmitBody, authorization: Optional[str] 
 # ---------- Uploaded material -> MCQ generation ----------
 
 from fastapi import UploadFile, File
+
+
+@app.get("/api/materials")
+def list_materials(authorization: Optional[str] = Header(None)):
+    """User's uploaded materials + the pre-loaded NSSTA/MoSPI manual library."""
+    user_id = require_user(authorization)
+    conn = get_db()
+    rows = conn.execute("SELECT id, filename, user_id, LENGTH(text) AS chars, created_at "
+                        "FROM materials WHERE user_id=? OR user_id=0 ORDER BY user_id, id",
+                        (user_id,)).fetchall()
+    conn.close()
+    return {"materials": [dict(r) for r in rows]}
 
 
 @app.post("/api/materials/upload")
@@ -836,7 +923,8 @@ def generate_material_quiz(material_id: int, n: int = 5, level: str = "Understan
                            authorization: Optional[str] = Header(None)):
     user_id = require_user(authorization)
     conn = get_db()
-    row = conn.execute("SELECT * FROM materials WHERE id=? AND user_id=?", (material_id, user_id)).fetchone()
+    row = conn.execute("SELECT * FROM materials WHERE id=? AND user_id IN (0, ?)",
+                       (material_id, user_id)).fetchone()
     conn.close()
     if not row:
         raise HTTPException(404, "Material not found")
@@ -845,8 +933,8 @@ def generate_material_quiz(material_id: int, n: int = 5, level: str = "Understan
     focus_query = None
     weak_areas = []
     if personalized:
-        _, key = _user_department(user_id)
-        gaps = ge.compute_gaps(user_id, key)
+        _, key, role_id = _user_context(user_id)
+        gaps = ge.compute_gaps(user_id, key, role_id)
         weak = [g["area"] for g in gaps["top_gaps"][:3]]
         if weak:
             weak_areas = weak
@@ -913,7 +1001,7 @@ def personalized_preview(authorization: Optional[str] = Header(None)):
     """Weak areas from memory + the recommended course/module that targets them."""
     user_id = require_user(authorization)
     _, key = _user_department(user_id)
-    gaps = ge.compute_gaps(user_id, key)
+    gaps = ge.compute_gaps(user_id, key, _user_context(user_id)[2])
     weak = [g["area"] for g in gaps["top_gaps"][:3]]
     import roadmap_data
     best = None
@@ -942,7 +1030,7 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
     competency bank when transcripts/LLM are unavailable."""
     user_id = require_user(authorization)
     _, key = _user_department(user_id)
-    gaps = ge.compute_gaps(user_id, key)
+    gaps = ge.compute_gaps(user_id, key, _user_context(user_id)[2])
     weak = [g["area"] for g in gaps["top_gaps"][:3]]
     if not weak:
         raise HTTPException(400, "No competency data yet — take the assessment first")
@@ -1062,7 +1150,7 @@ def personalized_grade(quiz_id: int, body: QuizSubmitBody, authorization: Option
                  {"quiz_id": quiz_id, "score": score, "areas": list(area_scores),
                   "strength": s_w[0], "weakness": s_w[1]})
     _, key = _user_department(user_id)
-    gaps = ge.compute_gaps(user_id, key)
+    gaps = ge.compute_gaps(user_id, key, _user_context(user_id)[2])
     ge.build_roadmap(user_id, key, COURSES, gaps, completed_ids=_completed_ids(user_id))
     strength, weakness = strength_weakness(area_scores)
     return {"score": score, "area_scores": area_scores,
@@ -1190,7 +1278,7 @@ def lesson_quiz_complete(course_key: str, module_no: int, video_no: int, body: C
                  {"course_key": course_key, "module_no": module_no, "video_no": video_no,
                   "score": score, "strength": s_w[0], "weakness": s_w[1]})
     _, key = _user_department(user_id)
-    gaps = ge.compute_gaps(user_id, key)
+    gaps = ge.compute_gaps(user_id, key, _user_context(user_id)[2])
     ge.build_roadmap(user_id, key, COURSES, gaps, completed_ids=_completed_ids(user_id))
     strength, weakness = strength_weakness(area_scores)
     return {"lesson_score": score, "area_scores": area_scores,
