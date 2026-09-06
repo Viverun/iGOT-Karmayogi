@@ -158,6 +158,27 @@ def login(body: AuthBody):
     }
 
 
+class ResetDemoBody(BaseModel):
+    email: str
+
+
+@app.post("/api/auth/reset-demo")
+def reset_demo(body: ResetDemoBody):
+    """DEMO-ONLY: wipe ALL learning memory for the demo user so every
+    registration starts a fresh session (assessments, progress, roadmap)."""
+    conn = get_db()
+    row = conn.execute("SELECT id FROM users WHERE email = ?", (body.email,)).fetchone()
+    if row:
+        uid = row["id"]
+        for table in ("tokens", "learning_events", "chapter_progress", "lesson_quizzes",
+                      "personalized_quizzes", "assessment_results", "user_competency",
+                      "enrollments", "roadmaps"):
+            conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (uid,))
+        conn.commit()
+    conn.close()
+    return {"message": "Demo session wiped — fresh start"}
+
+
 @app.post("/api/auth/logout")
 def logout(authorization: Optional[str] = Header(None)):
     """Invalidate the session token server-side."""

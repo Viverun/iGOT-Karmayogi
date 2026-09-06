@@ -120,6 +120,13 @@ async function doRegister() {
       const data = await res.json();
       throw new Error(data.detail || "Registration failed");
     }
+    // every registration starts a completely fresh session — wipe prior
+    // assessment scores, progress, roadmap and quiz history for this user
+    await fetch(`${API}/api/auth/reset-demo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "analyst@adrin.gov.in" }),
+    }).catch(() => {});
     const login = await fetch(`${API}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
