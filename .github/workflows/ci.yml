@@ -63,23 +63,20 @@ jobs:
 
   # ---------- CD: deploy (main pushes only, after CI passes) ----------
   deploy-frontend:
-    name: CD · Deploy frontend → Vercel
+    name: CD · Verify frontend → Vercel (git auto-deploy)
     if: github.event_name == 'push'
     needs: [backend, frontend]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Deploy to Vercel (production, from repo root — project Root Directory = dummy-igot)
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Wait for Vercel git auto-deploy and verify production is live
         run: |
-          npx --yes vercel@59 deploy --prod --yes --token "$VERCEL_TOKEN"
-          echo "✓ deployed to https://igot-karmayogi.vercel.app"
+          echo "Vercel auto-deploys this push (Root Directory: dummy-igot). Waiting for it to go live…"
+          for i in $(seq 1 60); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" https://igot-karmayogi.vercel.app/dashboard)
+            if [ "$CODE" = "200" ]; then echo "✓ production live at https://igot-karmayogi.vercel.app"; exit 0; fi
+            sleep 10
+          done
+          echo "✗ production did not come up in time"; exit 1
 
   deploy-backend:
     name: CD · Deploy backend → Render
