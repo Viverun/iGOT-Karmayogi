@@ -29,7 +29,6 @@
           <span id="readinessPct" class="text-2xl font-extrabold text-blue-800">–</span>
           <span class="text-[10px] text-slate-400">readiness</span>
         </div>
-        <p id="readinessCapNote" class="mt-3 text-[11px] leading-snug text-slate-400"></p>
       </div>
       <div>
         <h1 id="profileName" class="text-2xl font-bold text-[#1a3a6b]">Loading…</h1>
@@ -40,6 +39,7 @@
           <div><p id="statGaps" class="font-bold text-lg text-blue-800">–</p><p class="text-xs text-slate-400">open gaps</p></div>
         </div>
       </div>
+      <p id="readinessCapNote" class="lg:col-span-3 mt-4 border-t border-slate-100 pt-3 text-[11px] leading-snug text-slate-400"></p>
     </div>
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
       <h2 class="font-semibold text-slate-800">Top skill gaps</h2>
@@ -137,8 +137,8 @@ if (requireAuth()) {
     const capNote = document.getElementById("readinessCapNote");
     if (capNote) {
       capNote.textContent = d.verified_completions === 0
-        ? "Assessments alone show up to 30% — complete roadmap courses (quiz scores ≥ 60) to raise readiness."
-        : `Verified course completions: ${d.verified_completions} · readiness cap ${d.readiness_cap}%`;
+        ? "Courses completed (quiz ≥ 60) raise this beyond 30%."
+        : `${d.verified_completions} verified course${d.verified_completions > 1 ? "s" : ""} · cap ${d.readiness_cap}%`;
     }
     document.getElementById("statHours").textContent = d.learning_hours;
     document.getElementById("statCourses").textContent = d.enrollments.filter(e => e.status === "completed").length + "/" + d.enrollments.length;
