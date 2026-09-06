@@ -39,7 +39,7 @@
 </main>
 
 <script>
-if (requireAuth()) {
+if (requireAuth() && !redirectIfAdmin()) {
   document.getElementById("header").innerHTML = renderHeader("dashboard.html");
   let questions = [], idx = 0, chosen = {};
 

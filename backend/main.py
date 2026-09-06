@@ -1325,6 +1325,10 @@ def admin_analytics(authorization: Optional[str] = Header(None)):
     active_learners = conn.execute(
         "SELECT COUNT(DISTINCT user_id) AS n FROM lesson_quizzes WHERE score IS NOT NULL"
     ).fetchone()["n"]
+    per_course = conn.execute(
+        "SELECT course_key, COUNT(DISTINCT user_id) AS learners, ROUND(AVG(score),1) AS avg_score "
+        "FROM lesson_quizzes WHERE score IS NOT NULL GROUP BY course_key"
+    ).fetchall()
     users = conn.execute("SELECT id, name, department, designation FROM users WHERE id != 0").fetchall()
     conn.close()
 
@@ -1346,6 +1350,21 @@ def admin_analytics(authorization: Optional[str] = Header(None)):
                           for r in igot_completions if r["course_id"] in COURSES_BY_ID]
     course_completions += [{"course": name, "completions": n} for name, n in roadmap_completions.items()]
 
+    course_insights = []
+    for r in per_course:
+        course = roadmap_data.get_course(r["course_key"])
+        if not course:
+            continue
+        course_insights.append({
+            "course": course["name"], "provider": course["provider"],
+            "learners": r["learners"], "avg_quiz_score": r["avg_score"],
+        })
+    trending_courses = sorted(course_insights, key=lambda c: c["learners"], reverse=True)[:5]
+    hardest_courses = sorted(
+        [c for c in course_insights if c["learners"] >= 2],
+        key=lambda c: c["avg_quiz_score"],
+    )[:5]
+
     return {
         "total_users": total_users,
         "assessed_users": assessed_users,
@@ -1358,4 +1377,6 @@ def admin_analytics(authorization: Optional[str] = Header(None)):
         "department_sizes": [dict(r) for r in dept_stats],
         "course_completions": course_completions,
         "learner_readiness": readiness_rows,
+        "trending_courses": trending_courses,
+        "hardest_courses": hardest_courses,
     }

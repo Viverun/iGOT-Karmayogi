@@ -43,10 +43,28 @@ async function api(path, opts = {}) {
   return data;
 }
 
+const ADMIN_EMAIL = "admin.nssta@mospi.gov.in";
+function isAdminUser() {
+  const u = getUser();
+  return !!u && u.email === ADMIN_EMAIL;
+}
+/** Call at the top of any learner-only page (dashboard/studio/learn/etc.) to
+ * bounce the admin persona straight to the analytics view. */
+function redirectIfAdmin() {
+  if (isAdminUser() && !location.pathname.endsWith("admin.html")) {
+    location.href = "admin.html";
+    return true;
+  }
+  return false;
+}
+
 const NAV_LINKS = [
   { href: "dashboard.html", label: "Dashboard" },
   { href: "studio.html", label: "Trainer Studio" },
   { href: "admin.html", label: "Analytics" },
+];
+const ADMIN_NAV_LINKS = [
+  { href: "admin.html", label: "Admin Dashboard" },
 ];
 
 function renderFooter() {
@@ -98,9 +116,10 @@ function renderHeader(active) {
         </span>
       </a>
       <ul class="hidden lg:flex items-center gap-5 text-[15px] font-medium ml-2">
-        ${NAV_LINKS.map(l => `<li><a href="${l.href}" class="${active === l.href ? 'text-blue-800 font-semibold' : 'text-slate-600 hover:text-blue-700'}">${l.label}</a></li>`).join("")}
+        ${(isAdminUser() ? ADMIN_NAV_LINKS : NAV_LINKS).map(l => `<li><a href="${l.href}" class="${active === l.href ? 'text-blue-800 font-semibold' : 'text-slate-600 hover:text-blue-700'}">${l.label}</a></li>`).join("")}
       </ul>
       <div class="ml-auto flex items-center gap-3">
+        ${isAdminUser() ? '<span class="text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-100">Administrator</span>' : ''}
         <span class="text-sm text-slate-600 hidden md:block">Namaste, <span class="font-semibold text-blue-800">${user ? user.name.split(" ")[0] : ""}</span></span>
         <button onclick="logout()" class="px-5 py-2 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500 text-sm">Log out</button>
       </div>

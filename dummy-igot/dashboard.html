@@ -110,7 +110,7 @@
 </div>
 
 <script>
-if (requireAuth()) {
+if (requireAuth() && !redirectIfAdmin()) {
   document.getElementById("header").innerHTML = renderHeader("dashboard.html");
 
   const overlay = document.getElementById("welcomeOverlay");

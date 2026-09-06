@@ -43,7 +43,7 @@
 </main>
 
 <script>
-if (requireAuth()) {
+if (requireAuth() && !redirectIfAdmin()) {
   document.getElementById("header").innerHTML = renderHeader("");
   const courseId = new URLSearchParams(location.search).get("course");
   let quiz = null, chapterNo = null;

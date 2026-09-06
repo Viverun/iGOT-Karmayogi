@@ -70,7 +70,7 @@
 </div>
 
 <script>
-if (requireAuth()) {
+if (requireAuth() && !redirectIfAdmin()) {
   document.getElementById("header").innerHTML = renderHeader("dashboard.html");
   const courseKey = new URLSearchParams(location.search).get("course");
   const LS_KEY = "lesson_done_" + (getUser()?.email || "anon") + "_" + courseKey;

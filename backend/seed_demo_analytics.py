@@ -1,17 +1,18 @@
 """One-off seed for DEMO/PRESENTATION purposes only.
 
-Populates the local igot.db with ~10 synthetic MoSPI/NSSTA officer accounts
-carrying realistic-looking competency scores, assessment results and lesson
-completions, so the Admin Analytics dashboard has enough spread to demo
-(org-wide distributions, department breakdowns, readiness spread) without
-waiting for real officers to use the platform.
+Populates the local igot.db with a synthetic org-scale roster of MoSPI/NSSTA
+officers (~60 by default) carrying realistic-looking competency scores,
+assessment results and lesson completions, so the Admin Analytics dashboard
+reads like a real departmental rollout instead of 1-2 test accounts.
 
 This does NOT touch the API layer — /api/admin/analytics still computes
-everything live from these rows exactly as it would for real users. Re-run
-is safe (INSERT OR IGNORE on users by email); scores are upserted.
+everything live from these rows exactly as it would for real users; only the
+underlying rows are synthetic. Re-run is safe (INSERT OR IGNORE on users by
+email); scores are upserted per user/area.
 
-Usage: python3 seed_demo_analytics.py
+Usage: python3 seed_demo_analytics.py [count]   (default count: 60)
 """
+import json
 import random
 import sqlite3
 import sys
@@ -21,30 +22,32 @@ from db import DB_PATH, init_db
 
 random.seed(42)
 
-DEMO_OFFICERS = [
-    ("Priya Sharma", "priya.sharma@nssta.mospi.gov.in", "Senior Statistical Officer",
-     "Price Statistics Division (PSD), MoSPI", "statistics", 78),
-    ("Rajesh Kumar", "rajesh.kumar@nssta.mospi.gov.in", "Field Officer (JSO)",
-     "Field Operations Division (FOD), NSSO", "statistics", 55),
-    ("Anjali Nair", "anjali.nair@nssta.mospi.gov.in", "Deputy Director",
-     "Computer Centre (IT & AI Directorate), MoSPI", "general", 82),
-    ("Vikram Singh", "vikram.singh@nssta.mospi.gov.in", "Statistical Officer",
-     "Labour Bureau & Social Statistics", "statistics", 61),
-    ("Sunita Reddy", "sunita.reddy@nssta.mospi.gov.in", "Joint Director",
-     "Survey Design & Research Division (SDRD), MoSPI", "statistics", 70),
-    ("Arvind Menon", "arvind.menon@isro.gov.in", "Analyst",
-     "Department of Space and ISRO HQ", "space", 48),
-    ("Kavita Iyer", "kavita.iyer@isro.gov.in", "Scientist/Engineer",
-     "Department of Space and ISRO HQ", "space", 66),
-    ("Mohammed Faizal", "faizal@nssta.mospi.gov.in", "Director",
-     "National Accounts Division (NAD), MoSPI", "statistics", 74),
-    ("Deepa Krishnan", "deepa.krishnan@nssta.mospi.gov.in", "Under Secretary",
-     "Ministry of Statistics and Programme Implementation (MoSPI)", "general", 58),
-    ("Ramesh Chandra", "ramesh.chandra@nssta.mospi.gov.in", "Field Officer (JSO)",
-     "Field Operations Division (FOD), NSSO", "statistics", 39),
+FIRST_NAMES = [
+    "Priya", "Rajesh", "Anjali", "Vikram", "Sunita", "Arvind", "Kavita", "Mohammed",
+    "Deepa", "Ramesh", "Neha", "Suresh", "Pooja", "Anand", "Lakshmi", "Sanjay",
+    "Meera", "Vivek", "Divya", "Ashok", "Ritu", "Manoj", "Swati", "Rahul",
+    "Geeta", "Kiran", "Nandini", "Prakash", "Shobha", "Alok", "Uma", "Naveen",
+    "Radhika", "Sandeep", "Kalpana", "Yogesh", "Bhavna", "Ajay", "Sarita", "Dinesh",
+]
+LAST_NAMES = [
+    "Sharma", "Kumar", "Nair", "Singh", "Reddy", "Menon", "Iyer", "Faizal",
+    "Krishnan", "Chandra", "Gupta", "Verma", "Joshi", "Rao", "Pillai", "Mishra",
+    "Bose", "Desai", "Chatterjee", "Bhatt", "Kapoor", "Trivedi", "Pandey", "Shetty",
 ]
 
-# competency areas per department key (mirrors ontology.TARGET_PROFILES)
+# (title, department, dept_key, base_readiness_pct) — mirrors ontology.ROLE_PROFILES
+ROLES = [
+    ("Field Officer (JSO)", "Field Operations Division (FOD), NSSO", "statistics", 42),
+    ("Senior Statistical Officer", "Price Statistics Division (PSD), MoSPI", "statistics", 68),
+    ("Director", "National Accounts Division (NAD), MoSPI", "statistics", 79),
+    ("Joint Director", "Survey Design & Research Division (SDRD), MoSPI", "statistics", 72),
+    ("Deputy Director", "Computer Centre (IT & AI Directorate), MoSPI", "general", 75),
+    ("Statistical Officer", "Labour Bureau & Social Statistics", "statistics", 54),
+    ("Analyst", "Department of Space and ISRO HQ", "space", 47),
+    ("Scientist/Engineer", "Department of Space and ISRO HQ", "space", 63),
+    ("Under Secretary", "Ministry of Statistics and Programme Implementation (MoSPI)", "general", 57),
+]
+
 AREAS_BY_KEY = {
     "statistics": ["Sampling Techniques", "Survey Design", "Statistical Methods",
                    "Data Interpretation", "Python", "SQL", "Digital Governance",
@@ -60,13 +63,45 @@ AREAS_BY_KEY = {
                 "Communication", "Ethics and Values"],
 }
 
+# (course_key, module_layout, popularity_weight, difficulty_penalty)
+# popularity_weight biases how often officers land in this course (trending);
+# difficulty_penalty is subtracted from their quiz scores (makes a course
+# show up as "officers find this difficult" in admin analytics).
+COURSE_PROFILES = [
+    ("rs-fundamentals", [3, 4, 3], 5, 0),
+    ("gis-essentials", [2, 2, 2], 4, 8),
+    ("python-geospatial", [2, 2, 2], 3, 5),
+    ("satcom-gnss", [2, 3, 2], 3, 24),   # hardest — GNSS math trips people up
+    ("geo-governance", [2, 2, 2], 4, 3),
+]
+COURSE_WEIGHTS = [p[2] for p in COURSE_PROFILES]
 
-def seed():
+
+def make_roster(n: int):
+    used_emails = set()
+    roster = []
+    for i in range(n):
+        first, last = random.choice(FIRST_NAMES), random.choice(LAST_NAMES)
+        name = f"{first} {last}"
+        title, department, dept_key, base_pct = random.choice(ROLES)
+        slug = f"{first}.{last}".lower()
+        email = f"{slug}@nssta.mospi.gov.in"
+        n_dup = 1
+        while email in used_emails:
+            n_dup += 1
+            email = f"{slug}{n_dup}@nssta.mospi.gov.in"
+        used_emails.add(email)
+        noise = random.randint(-12, 12)
+        roster.append((name, email, title, department, dept_key, max(15, min(95, base_pct + noise))))
+    return roster
+
+
+def seed(n: int = 60):
     init_db()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
-    for name, email, designation, department, dept_key, base_pct in DEMO_OFFICERS:
+    for name, email, designation, department, dept_key, base_pct in make_roster(n):
         conn.execute(
             "INSERT OR IGNORE INTO users (name, email, password, designation, department) "
             "VALUES (?,?,?,?,?)",
@@ -86,52 +121,59 @@ def seed():
                 (uid, area, scores[area]),
             )
 
-        import json
-        conn.execute(
-            "INSERT INTO assessment_results (user_id, department_key, answers_json, scores_json, submitted_at) "
-            "VALUES (?, ?, ?, ?, datetime('now'))",
-            (uid, dept_key, "[]", json.dumps(scores)),
-        )
+        # ~85% of the roster has taken the diagnostic assessment
+        if random.random() < 0.85:
+            conn.execute(
+                "INSERT INTO assessment_results (user_id, department_key, answers_json, scores_json, submitted_at) "
+                "VALUES (?, ?, ?, ?, datetime('now'))",
+                (uid, dept_key, "[]", json.dumps(scores)),
+            )
 
-        # a plausible spread of lesson-quiz activity so "active learners" and
-        # "avg lesson quiz score" have real, varied numbers to aggregate.
-        # rs-fundamentals has 3 modules of {3,4,3} videos = 10 lessons total.
-        module_layout = [3, 4, 3]
-        lessons_done = random.choice([0, 2, 4, 6, 10, 10])  # some finish the whole course
-        n_placed = 0
-        for m_no, video_count in enumerate(module_layout, start=1):
-            for v_no in range(1, video_count + 1):
-                if n_placed >= lessons_done:
-                    break
-                quiz_score = max(40, min(100, base_pct + random.randint(-10, 20)))
-                conn.execute(
-                    "INSERT OR REPLACE INTO lesson_quizzes "
-                    "(user_id, course_key, module_no, video_no, video_id, questions_json, generator, score) "
-                    "VALUES (?, 'rs-fundamentals', ?, ?, 'demo', '[]', 'llm', ?)",
-                    (uid, m_no, v_no, quiz_score),
-                )
-                n_placed += 1
-        if lessons_done >= 10:
-            for m_no in range(1, 4):
-                conn.execute(
-                    "INSERT OR REPLACE INTO module_quizzes "
-                    "(user_id, course_key, module_no, questions_json, generator) "
-                    "VALUES (?, 'rs-fundamentals', ?, '[]', 'llm')",
-                    (uid, m_no),
-                )
-                mod_score = max(60, min(100, base_pct + random.randint(-5, 15)))
-                conn.execute(
-                    "INSERT INTO chapter_progress (user_id, course_id, chapter_no, quiz_score) "
-                    "VALUES (?, 'roadmap:rs-fundamentals', ?, ?) "
-                    "ON CONFLICT(user_id, course_id, chapter_no) DO UPDATE SET quiz_score=excluded.quiz_score",
-                    (uid, m_no, mod_score),
-                )
+        # a plausible spread of lesson-quiz activity, spread across all 5
+        # roadmap courses (each with its own popularity/difficulty bias) so
+        # "trending courses" and "courses officers find difficult" have real
+        # numbers to compare instead of a single course carrying all the data.
+        n_courses_touched = random.choice([0, 1, 1, 1, 2, 2])
+        touched = random.choices(COURSE_PROFILES, weights=COURSE_WEIGHTS, k=n_courses_touched)
+        for course_key, module_layout, _weight, difficulty in {c[0]: c for c in touched}.values():
+            total_lessons = sum(module_layout)
+            lessons_done = random.choice([2, 4, total_lessons, total_lessons, total_lessons])
+            lessons_done = min(lessons_done, total_lessons)
+            n_placed = 0
+            for m_no, video_count in enumerate(module_layout, start=1):
+                for v_no in range(1, video_count + 1):
+                    if n_placed >= lessons_done:
+                        break
+                    quiz_score = max(15, min(100, base_pct - difficulty + random.randint(-10, 15)))
+                    conn.execute(
+                        "INSERT OR REPLACE INTO lesson_quizzes "
+                        "(user_id, course_key, module_no, video_no, video_id, questions_json, generator, score) "
+                        "VALUES (?, ?, ?, ?, 'demo', '[]', 'llm', ?)",
+                        (uid, course_key, m_no, v_no, quiz_score),
+                    )
+                    n_placed += 1
+            if lessons_done >= total_lessons:
+                for m_no in range(1, len(module_layout) + 1):
+                    conn.execute(
+                        "INSERT OR REPLACE INTO module_quizzes "
+                        "(user_id, course_key, module_no, questions_json, generator) "
+                        "VALUES (?, ?, ?, '[]', 'llm')",
+                        (uid, course_key, m_no),
+                    )
+                    mod_score = max(15, min(100, base_pct - difficulty + random.randint(-5, 10)))
+                    conn.execute(
+                        "INSERT INTO chapter_progress (user_id, course_id, chapter_no, quiz_score) "
+                        "VALUES (?, ?, ?, ?) "
+                        "ON CONFLICT(user_id, course_id, chapter_no) DO UPDATE SET quiz_score=excluded.quiz_score",
+                        (uid, f"roadmap:{course_key}", m_no, mod_score),
+                    )
 
     conn.commit()
-    n = conn.execute("SELECT COUNT(*) AS n FROM users WHERE id != 0").fetchone()["n"]
+    total = conn.execute("SELECT COUNT(*) AS n FROM users WHERE id != 0").fetchone()["n"]
     conn.close()
-    print(f"Seeded demo officers. Total users now: {n}")
+    print(f"Seeded {n} synthetic officers. Total users now: {total}")
 
 
 if __name__ == "__main__":
-    seed()
+    count = int(sys.argv[1]) if len(sys.argv) > 1 else 60
+    seed(count)
