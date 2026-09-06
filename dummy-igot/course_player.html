@@ -131,18 +131,9 @@ if (requireAuth()) {
     const row = tick ? tick.closest("div.flex.items-stretch") : null;
     if (row) row.querySelector(".lq-btn").disabled = false;
     refreshModuleBadges();
-    // auto-advance to the next unmarked lesson in the same module
-    const { mi, vi } = playingLesson;
-    const videos = currentCourse.modules[mi].videos;
-    for (let j = vi + 1; j < videos.length; j++) {
-      if (!s.has(lessonId(mi, j))) {
-        const row = document.querySelectorAll(`#mb${mi} .video-row`)[j];
-        if (row) row.click();
-        return;
-      }
-    }
-    // module finished — scroll to its quiz button
-    document.getElementById("mq" + mi)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // bring the unlocked Quiz button into view
+    const qbtn = document.getElementById("mq" + mi);
+    if (qbtn && !qbtn.disabled) qbtn.scrollIntoView({ behavior: "smooth", block: "center" });
   }
   window.markLessonDone = markLessonDone;
 
