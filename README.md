@@ -96,7 +96,7 @@ any other hostname → `https://igot-karmayogi-api.onrender.com` (override by se
 - **frontend job** — verifies every page uses the `IGOT_API_BASE` resolver (no hardcoded localhost),
   and all 9 pages exist.
 
-### Production caveat (intentional for the demo)
+### Production caveat (intentional for the demo)hi
 Render's free tier has an **ephemeral disk** — `igot.db` (SQLite) resets on redeploy/restart, so the
 demo user/assessment data lives only between restarts. For a persistent demo, attach a Render Disk
 at `/opt/render/project/src/backend` or point `DB_PATH` at Postgres later.
