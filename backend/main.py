@@ -536,6 +536,23 @@ def health():
     return {"status": "ok", "demo_user": DEMO_USER["email"], "courses": len(COURSES)}
 
 
+@app.post("/api/admin/seed-demo-data")
+def admin_seed_demo_data(count: int = 60, authorization: Optional[str] = Header(None)):
+    """DEMO-ONLY: populate the database with a synthetic officer roster so Org
+    Analytics has enough spread to present (org-wide distributions, department
+    breakdowns, trending/hardest courses). Restricted to the seeded NSSTA
+    Administrator account. Safe to re-run — see seed_demo_analytics.py."""
+    user_id = require_user(authorization)
+    conn = get_db()
+    email = conn.execute("SELECT email FROM users WHERE id=?", (user_id,)).fetchone()["email"]
+    conn.close()
+    if email != "admin.nssta@mospi.gov.in":
+        raise HTTPException(403, "Only the Training Administrator account can seed demo data")
+    import seed_demo_analytics
+    seed_demo_analytics.seed(min(count, 150))
+    return {"status": "seeded", "count": min(count, 150)}
+
+
 @app.on_event("startup")
 def startup_indexing():
     try:
