@@ -120,7 +120,7 @@ if (requireAuth() && !redirectIfAdmin()) {
     window.scrollTo({ top: card.offsetTop - 80, behavior: "smooth" });
   }
 
-  load().catch(e => document.body.insertAdjacentHTML("beforeend", `<p class="text-red-600 p-6">${e.message}</p>`));
+  load().catch(e => showPageError(e.message));
   Object.assign(window, { startChapter, closeQuiz, submitQuiz });
 }
 </script>

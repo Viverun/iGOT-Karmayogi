@@ -43,6 +43,27 @@ async function api(path, opts = {}) {
   return data;
 }
 
+/** Render a page-level load failure as a proper banner inside <main>, instead
+ * of a raw line of red text dumped after the footer. Use as:
+ *   load().catch(e => showPageError(e.message));
+ * Safe to call more than once — replaces any existing banner rather than stacking. */
+function showPageError(message) {
+  document.getElementById("pageErrorBanner")?.remove();
+  const el = document.createElement("div");
+  el.id = "pageErrorBanner";
+  el.className = "mx-auto max-w-7xl px-6 mt-4";
+  el.innerHTML = `
+    <div class="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4 flex items-start gap-3 shadow-sm">
+      <span class="text-lg leading-none">⚠️</span>
+      <div>
+        <p class="font-semibold text-sm">Something went wrong loading this page</p>
+        <p class="text-sm mt-0.5">${String(message).replace(/</g, "&lt;")}</p>
+      </div>
+    </div>`;
+  const main = document.querySelector("main");
+  if (main) main.prepend(el); else document.body.prepend(el);
+}
+
 const ADMIN_EMAIL = "admin.nssta@mospi.gov.in";
 function isAdminUser() {
   const u = getUser();

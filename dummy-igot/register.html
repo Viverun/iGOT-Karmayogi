@@ -78,12 +78,12 @@
       </div>
       <div>
         <label class="text-sm font-medium">Ministry/Department <span class="text-red-500">*</span></label>
-        <input readonly id="f_department" value="Department of Space and ISRO HQ"
+        <input readonly id="f_department" value="Department of Space and ISRO HQ" title="Department of Space and ISRO HQ"
                class="ro-field mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
       </div>
       <div>
         <label class="text-sm font-medium">Organisation <span class="text-red-500">*</span></label>
-        <input readonly id="f_org" value="Advanced Data Processing Research Institute (ADRIN)"
+        <input readonly id="f_org" value="Advanced Data Processing Research Institute (ADRIN)" title="Advanced Data Processing Research Institute (ADRIN)"
                class="ro-field mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
       </div>
       <p class="flex justify-between text-xs text-slate-400"><span>Not found yet?</span><a href="#" class="text-blue-700 font-medium">Request for help</a></p>
@@ -140,7 +140,9 @@ function setPersona(key) {
   persona = key;
   const p = PERSONAS[key];
   document.getElementById("f_department").value = p.department;
+  document.getElementById("f_department").title = p.department;
   document.getElementById("f_org").value = p.org;
+  document.getElementById("f_org").title = p.org;
   document.getElementById("f_designation").value = p.designation;
   document.getElementById("f_email").value = p.email;
   document.getElementById("registerBtn").textContent = key === "admin" ? "Sign in as Administrator" : "Register";

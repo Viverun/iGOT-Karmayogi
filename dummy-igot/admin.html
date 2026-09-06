@@ -296,7 +296,7 @@ if (requireAuth()) {
       </table>`;
   }
 
-  load().catch(e => document.body.insertAdjacentHTML("beforeend", `<p class="text-red-600 p-6">${e.message}</p>`));
+  load().catch(e => showPageError(e.message));
 }
 </script>
 </body>

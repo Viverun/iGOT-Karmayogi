@@ -78,7 +78,7 @@
       <p id="libStatus" class="mt-3 text-sm text-slate-500"></p>
       <hr class="my-5 border-slate-100" />
       <h2 class="font-semibold text-slate-800">⚙️ Generate quiz from material</h2>
-      <p class="text-xs text-slate-400 mt-1">Creates MCQs from the selected document, weighted toward the learner's weaker areas.</p>
+      <p class="text-xs text-slate-400 mt-1">Creates MCQs from the selected document, weighted toward the learner's weaker areas. Uses whichever document you uploaded or picked from the library above.</p>
       <div class="mt-4 flex gap-3 items-end">
         <div>
           <label class="text-xs text-slate-500">Questions</label>
@@ -231,7 +231,9 @@ if (requireAuth() && !redirectIfAdmin()) {
     }
     sel.innerHTML = lib.map(m => `<option value="${m.id}">${m.filename.replace(/\.[^.]+$/, "").replace(/_/g, " ")}</option>`).join("");
     sel.onchange = () => { currentMaterial = +sel.value; };
+    currentMaterial = +sel.value;  // the first library option is pre-selected by default
     document.getElementById("libGenBtn").disabled = false;
+    document.getElementById("genBtn").disabled = false;
   }
   window.loadLibrary = loadLibrary;
 

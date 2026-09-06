@@ -404,7 +404,7 @@ if (requireAuth() && !redirectIfAdmin()) {
     // auto-select the first lesson so the player is never blank
     const first = document.querySelector(".video-row");
     if (first) first.click();
-  }).catch(e => document.body.insertAdjacentHTML("beforeend", `<p class="text-red-600 p-6">${e.message}</p>`));
+  }).catch(e => showPageError(e.message));
 }
 </script>
 </body>

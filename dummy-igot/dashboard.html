@@ -284,7 +284,7 @@ if (requireAuth() && !redirectIfAdmin()) {
     location.href = "learn.html?course=" + courseId;
   }
 
-  load().catch(e => document.body.insertAdjacentHTML("beforeend", `<p class="text-red-600 p-6">${e.message}</p>`));
+  load().catch(e => showPageError(e.message));
   Object.assign(window, { welcomeNext, welcomePrev, enrollFromRoadmap });
 }
 </script>
