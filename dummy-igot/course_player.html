@@ -339,10 +339,20 @@ if (requireAuth()) {
           ${!r.strength && !r.weakness ? '<span class="text-emerald-700 font-semibold">Perfect score — no weaknesses detected 🎉</span>' : ""}
         </div>
         <p class="text-xs text-slate-400 mt-2">Role readiness ${r.readiness_pct}%</p>
-        <button onclick="location.reload()" class="mt-4 px-6 py-2 rounded-full bg-blue-700 text-white font-semibold text-sm">${r.lesson_score >= 60 ? "Continue to next lesson →" : "Retry lesson quiz"}</button>
+        ${r.lesson_score >= 60
+          ? '<button onclick="location.reload()" class="mt-4 px-6 py-2 rounded-full bg-blue-700 text-white font-semibold text-sm">Continue to next lesson →</button>'
+          : '<p class="text-xs text-red-500 mt-2 font-semibold">You need 60% to pass. Retry — same questions, unlimited attempts.</p><button onclick="retryLessonQuiz()" class="mt-3 px-6 py-2 rounded-full bg-orange-400 text-white font-semibold text-sm hover:bg-orange-500">🔄 Retry Quiz</button>'}
       </div>`;
   }
   window.submitLessonQuiz = submitLessonQuiz;
+
+  function retryLessonQuiz() {
+    document.getElementById("quizResult").classList.add("hidden");
+    document.getElementById("quizError").classList.add("hidden");
+    document.getElementById("quizBody").innerHTML = "";
+    startLessonQuiz(lessonQuizState.moduleNo, lessonQuizState.videoNo);
+  }
+  window.retryLessonQuiz = retryLessonQuiz;
 
   async function submitQuiz() {
     const answers = currentQuiz.questions.map(q => {
@@ -367,10 +377,19 @@ if (requireAuth()) {
           ${!r.strength && !r.weakness ? '<span class="text-emerald-700 font-semibold">Perfect score — no weaknesses detected 🎉</span>' : ""}
         </div>
         <p class="text-xs text-slate-400 mt-2">Course progress ${r.course_progress_pct}% · role readiness ${r.readiness_pct}%</p>
-        <button onclick="location.reload()" class="mt-4 px-6 py-2 rounded-full bg-blue-700 text-white font-semibold text-sm">Continue learning</button>
+        ${r.module_score >= 60
+          ? '<button onclick="location.reload()" class="mt-4 px-6 py-2 rounded-full bg-blue-700 text-white font-semibold text-sm">Continue learning</button>'
+          : '<p class="text-xs text-red-500 font-semibold mt-2">You need 60% to pass this module. Retry below.</p><button onclick="retryModuleQuiz()" class="mt-3 px-6 py-2 rounded-full bg-orange-400 text-white font-semibold text-sm hover:bg-orange-500">🔄 Retry Module Quiz</button>'}
       </div>`;
   }
   window.submitQuiz = submitQuiz;
+
+  function retryModuleQuiz() {
+    document.getElementById("quizResult").classList.add("hidden");
+    document.getElementById("quizBody").innerHTML = "";
+    startModuleQuiz(currentModuleNo);
+  }
+  window.retryModuleQuiz = retryModuleQuiz;
   function submitCurrentQuiz() { return lessonQuizState ? submitLessonQuiz() : submitQuiz(); }
   window.submitCurrentQuiz = submitCurrentQuiz;
 
