@@ -562,6 +562,31 @@ def startup_indexing():
     except Exception as e:
         print("Pinecone course indexing skipped:", e)
     _seed_mospi_library()
+    _seed_demo_analytics_if_requested()
+
+
+def _seed_demo_analytics_if_requested():
+    """Render's free-tier disk is ephemeral — every redeploy wipes SQLite, so
+    any manually-seeded demo data disappears on the next push. Set the env
+    var SEED_DEMO_DATA=1 (Render dashboard -> service -> Environment) to make
+    the synthetic officer roster self-heal on every boot instead. Skips if
+    the roster already looks populated, so it won't keep duplicating rows on
+    every restart/redeploy once seeded."""
+    import os
+    if os.environ.get("SEED_DEMO_DATA") != "1":
+        return
+    conn = get_db()
+    total = conn.execute("SELECT COUNT(*) AS n FROM users WHERE id != 0").fetchone()["n"]
+    conn.close()
+    if total >= 20:
+        print(f"demo seed skipped — {total} users already present")
+        return
+    try:
+        import seed_demo_analytics
+        seed_demo_analytics.seed(60)
+        print("demo analytics roster auto-seeded on startup (SEED_DEMO_DATA=1)")
+    except Exception as e:
+        print("demo seed failed:", e)
 
 
 def _seed_mospi_library():
