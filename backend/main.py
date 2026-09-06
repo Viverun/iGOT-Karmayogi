@@ -1289,22 +1289,73 @@ def lesson_quiz_complete(course_key: str, module_no: int, video_no: int, body: C
 @app.get("/api/admin/analytics")
 def admin_analytics(authorization: Optional[str] = Header(None)):
     require_user(authorization)
+    import roadmap_data
     conn = get_db()
     area_stats = conn.execute(
         "SELECT area, ROUND(AVG(score),1) AS avg_score, COUNT(*) AS n FROM user_competency GROUP BY area ORDER BY avg_score"
     ).fetchall()
     dept_stats = conn.execute(
-        "SELECT u.department, COUNT(DISTINCT u.id) AS users FROM users u LEFT JOIN enrollments e ON e.user_id=u.id GROUP BY u.department"
+        "SELECT u.department, COUNT(DISTINCT u.id) AS users FROM users u WHERE u.id != 0 GROUP BY u.department"
     ).fetchall()
-    completions = conn.execute(
+    igot_completions = conn.execute(
         "SELECT course_id, COUNT(*) AS completions FROM enrollments WHERE status='completed' GROUP BY course_id"
     ).fetchall()
-    total_users = conn.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
+    # roadmap (ISRO/TPAC-style) course completions: a course counts as "completed" for a
+    # user once every lesson in it has a recorded quiz score
+    roadmap_rows = conn.execute(
+        "SELECT course_key, user_id, COUNT(*) AS done FROM lesson_quizzes WHERE score IS NOT NULL GROUP BY course_key, user_id"
+    ).fetchall()
+    roadmap_completions = {}
+    for r in roadmap_rows:
+        course = roadmap_data.get_course(r["course_key"])
+        if not course:
+            continue
+        total_lessons = sum(len(m["videos"]) for m in course["modules"])
+        if r["done"] >= total_lessons:
+            roadmap_completions[course["name"]] = roadmap_completions.get(course["name"], 0) + 1
+    total_users = conn.execute("SELECT COUNT(*) AS n FROM users WHERE id != 0").fetchone()["n"]
+    assessed_users = conn.execute("SELECT COUNT(DISTINCT user_id) AS n FROM assessment_results WHERE user_id != 0").fetchone()["n"]
+    avg_assessment = conn.execute("SELECT ROUND(AVG(overall),1) AS a FROM ("
+                                   "SELECT (SELECT SUM(value) FROM json_each(scores_json)) / "
+                                   "(SELECT COUNT(*) FROM json_each(scores_json)) AS overall "
+                                   "FROM assessment_results)").fetchone()
+    lesson_scores = conn.execute(
+        "SELECT ROUND(AVG(score),1) AS avg_score, COUNT(*) AS n FROM lesson_quizzes WHERE score IS NOT NULL"
+    ).fetchone()
+    active_learners = conn.execute(
+        "SELECT COUNT(DISTINCT user_id) AS n FROM lesson_quizzes WHERE score IS NOT NULL"
+    ).fetchone()["n"]
+    users = conn.execute("SELECT id, name, department, designation FROM users WHERE id != 0").fetchall()
     conn.close()
+
+    readiness_rows = []
+    for u in users:
+        try:
+            dept, key, role_id = _user_context(u["id"])
+            gaps = ge.compute_gaps(u["id"], key, role_id)
+            readiness_rows.append({
+                "user_id": u["id"], "name": u["name"], "department": dept,
+                "designation": u["designation"], "readiness_pct": gaps["readiness_pct"],
+            })
+        except Exception:
+            continue
+    readiness_rows.sort(key=lambda r: r["readiness_pct"])
+    avg_readiness = round(sum(r["readiness_pct"] for r in readiness_rows) / len(readiness_rows), 1) if readiness_rows else 0
+
+    course_completions = [{**dict(r), "course": COURSES_BY_ID[r["course_id"]]["name"]}
+                          for r in igot_completions if r["course_id"] in COURSES_BY_ID]
+    course_completions += [{"course": name, "completions": n} for name, n in roadmap_completions.items()]
+
     return {
         "total_users": total_users,
+        "assessed_users": assessed_users,
+        "active_learners": active_learners,
+        "avg_readiness": avg_readiness,
+        "avg_assessment_score": (avg_assessment["a"] or 0) if avg_assessment else 0,
+        "avg_lesson_quiz_score": lesson_scores["avg_score"] or 0,
+        "lesson_quizzes_taken": lesson_scores["n"] or 0,
         "competency_distribution": [dict(r) for r in area_stats],
         "department_sizes": [dict(r) for r in dept_stats],
-        "course_completions": [{**dict(r), "course": COURSES_BY_ID[r["course_id"]]["name"]}
-                               for r in completions if r["course_id"] in COURSES_BY_ID],
+        "course_completions": course_completions,
+        "learner_readiness": readiness_rows,
     }

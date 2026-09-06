@@ -72,18 +72,35 @@ def competency_vector(user_id: int, department_key: str, role_id: str | None = N
 
 def _verified_course_completions(user_id: int) -> int:
     """Courses completed with a solid quiz record (avg quiz score >= 60).
-    Merely finishing videos isn't enough — the quizzes back it up."""
+    Merely finishing videos isn't enough — the quizzes back it up.
+
+    Two course families feed this: iGOT catalogue courses (verified against
+    `enrollments.status='completed'`) and roadmap courses (verified by having
+    a graded chapter_progress row — course_id 'roadmap:<key>' — for every
+    module the course actually has, per roadmap_data)."""
+    import roadmap_data
+
     conn = get_db()
     rows = conn.execute(
-        "SELECT course_id, AVG(quiz_score) AS avg_score FROM chapter_progress "
-        "WHERE user_id=? GROUP BY course_id", (user_id,)).fetchall()
-    conn.close()
-    conn2 = get_db()
-    completed = {r["course_id"] for r in conn2.execute(
+        "SELECT course_id, AVG(quiz_score) AS avg_score, COUNT(*) AS n_modules "
+        "FROM chapter_progress WHERE user_id=? GROUP BY course_id", (user_id,)).fetchall()
+    completed_igot = {r["course_id"] for r in conn.execute(
         "SELECT course_id FROM enrollments WHERE user_id=? AND status='completed'", (user_id,)).fetchall()}
-    conn2.close()
-    return sum(1 for r in rows
-               if r["course_id"] in completed and r["avg_score"] is not None and r["avg_score"] >= 60)
+    conn.close()
+
+    count = 0
+    for r in rows:
+        if r["avg_score"] is None or r["avg_score"] < 60:
+            continue
+        course_id = r["course_id"]
+        if isinstance(course_id, str) and course_id.startswith("roadmap:"):
+            key = course_id.split(":", 1)[1]
+            course = roadmap_data.get_course(key)
+            if course and r["n_modules"] >= len(course["modules"]):
+                count += 1
+        elif course_id in completed_igot:
+            count += 1
+    return count
 
 
 def compute_gaps(user_id: int, department_key: str, role_id: str | None = None) -> dict:

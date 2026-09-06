@@ -128,6 +128,14 @@ DEMO_USER = {
     "department": "Ministry of Statistics and Programme Implementation (MoSPI)",
 }
 
+ADMIN_USER = {
+    "name": "NSSTA Training Administrator",
+    "email": "admin.nssta@mospi.gov.in",
+    "password": "demo123",
+    "designation": "Training Administrator (TPAC Cell)",
+    "department": "National Statistical Systems Training Academy (NSSTA), MoSPI",
+}
+
 
 def get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
@@ -146,10 +154,18 @@ def init_db():
     lcols = [r[1] for r in conn.execute("PRAGMA table_info(lesson_quizzes)")]
     if "score" not in lcols:
         conn.execute("ALTER TABLE lesson_quizzes ADD COLUMN score REAL")
+    ucols = [r[1] for r in conn.execute("PRAGMA table_info(users)")]
+    if "role" not in ucols:
+        conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'official'")
     conn.execute(
         "INSERT OR IGNORE INTO users (name, email, password, designation, department) VALUES (?,?,?,?,?)",
         (DEMO_USER["name"], DEMO_USER["email"], DEMO_USER["password"],
          DEMO_USER["designation"], DEMO_USER["department"]),
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO users (name, email, password, designation, department, role) VALUES (?,?,?,?,?,'admin')",
+        (ADMIN_USER["name"], ADMIN_USER["email"], ADMIN_USER["password"],
+         ADMIN_USER["designation"], ADMIN_USER["department"]),
     )
     conn.commit()
     conn.close()

@@ -9,67 +9,187 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <script src="common.js"></script>
-<style>body { font-family: 'Poppins', sans-serif; }</style>
+<style>
+  body { font-family: 'Poppins', sans-serif; }
+  .kpi-card { transition: transform .15s ease, box-shadow .15s ease; }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px -8px rgba(26,58,107,.18); }
+  .bar-track { background: #eef2f7; }
+</style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800">
 <div id="header"></div>
 
 <main class="mx-auto max-w-7xl px-6 py-8 mb-16">
-  <h1 class="text-2xl font-bold text-[#1a3a6b]">📊 Organization Analytics</h1>
-  <p class="text-sm text-slate-500 mt-1">Workforce competency distribution, training effectiveness and course completions across the organization.</p>
+  <div class="flex items-end justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-[#1a3a6b]">📊 Organization Analytics</h1>
+      <p class="text-sm text-slate-500 mt-1">Workforce competency distribution, training effectiveness and predictive capacity-building needs across MoSPI/NSSTA.</p>
+    </div>
+    <span class="text-xs font-medium px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">Live · refreshed on load</span>
+  </div>
 
-  <div id="statCards" class="mt-6 grid md:grid-cols-4 gap-4"></div>
+  <!-- KPI row -->
+  <div id="statCards" class="mt-6 grid sm:grid-cols-2 lg:grid-cols-5 gap-4"></div>
+
+  <!-- Training effectiveness -->
+  <div class="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-slate-800">Training effectiveness</h2>
+      <span class="text-xs text-slate-400">Diagnostic assessment score vs. in-course lesson quiz score</span>
+    </div>
+    <div id="effectivenessBars" class="mt-4 grid sm:grid-cols-2 gap-6"></div>
+  </div>
 
   <div class="mt-6 grid lg:grid-cols-2 gap-6">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-      <h2 class="font-semibold text-slate-800">Competency distribution (avg score by area)</h2>
+      <h2 class="font-semibold text-slate-800">Competency distribution (org avg score by area)</h2>
+      <p class="text-xs text-slate-400 mt-0.5">Red/amber areas are where the workforce is furthest from target — prime candidates for the next TPAC training wave.</p>
       <div class="h-80 mt-3"><canvas id="areaChart"></canvas></div>
     </div>
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
       <h2 class="font-semibold text-slate-800">Course completions</h2>
+      <p class="text-xs text-slate-400 mt-0.5">Verified completions (all modules finished, quiz-backed) across the iGOT catalogue and roadmap courses.</p>
       <div class="h-80 mt-3"><canvas id="completionChart"></canvas></div>
     </div>
   </div>
 
+  <div class="mt-6 grid lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <h2 class="font-semibold text-slate-800">Workforce by department</h2>
+      <div class="h-72 mt-3"><canvas id="deptChart"></canvas></div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <h2 class="font-semibold text-slate-800">Readiness distribution</h2>
+      <p class="text-xs text-slate-400 mt-0.5">Where each officer stands: 0-30% = assessed only, 30%+ = verified course completions raising the ceiling.</p>
+      <div class="h-72 mt-3"><canvas id="readinessChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <h2 class="font-semibold text-slate-800">Officer readiness leaderboard</h2>
+      <span class="text-xs text-slate-400">Lowest readiness first — where to focus outreach</span>
+    </div>
+    <div id="leaderboard" class="mt-3 overflow-x-auto"></div>
+  </div>
+
   <div class="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
     <h2 class="font-semibold text-slate-800">Predictive capacity-building needs</h2>
+    <p class="text-xs text-slate-400 mt-0.5">The 5 weakest org-wide competencies, ranked — feed these into the next TPAC training cycle.</p>
     <div id="needsTable" class="mt-3 text-sm"></div>
   </div>
 </main>
 
 <script>
+const COLORS = { good: "#10b981", mid: "#f59e0b", bad: "#ef4444", brand: "#1a6fd4", brandDark: "#1a3a6b" };
+function tierColor(v) { return v >= 70 ? COLORS.good : v >= 40 ? COLORS.mid : COLORS.bad; }
+
 if (requireAuth()) {
   document.getElementById("header").innerHTML = renderHeader("admin.html");
 
   async function load() {
     const a = await api("/api/admin/analytics");
-    document.getElementById("statCards").innerHTML = `
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5"><p class="text-3xl font-extrabold text-blue-800">${a.total_users}</p><p class="text-xs text-slate-400 mt-1">registered karmayogis</p></div>
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5"><p class="text-3xl font-extrabold text-blue-800">${a.competency_distribution.length}</p><p class="text-xs text-slate-400 mt-1">competencies tracked</p></div>
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5"><p class="text-3xl font-extrabold text-blue-800">${a.course_completions.reduce((s, c) => s + c.completions, 0)}</p><p class="text-xs text-slate-400 mt-1">total completions</p></div>
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5"><p class="text-3xl font-extrabold ${a.competency_distribution[0] && a.competency_distribution[0].avg_score < 40 ? 'text-red-600' : 'text-blue-800'}">${a.competency_distribution[0] ? a.competency_distribution[0].area : '—'}</p><p class="text-xs text-slate-400 mt-1">weakest org-wide area</p></div>`;
 
-    const dist = [...a.competency_distribution].reverse();  // weakest last for horizontal bars
+    // ---- KPI cards ----
+    const assessedPct = a.total_users ? Math.round(100 * a.assessed_users / a.total_users) : 0;
+    const kpis = [
+      { label: "registered officers", value: a.total_users, sub: `${a.assessed_users} assessed (${assessedPct}%)` },
+      { label: "active learners", value: a.active_learners, sub: `${a.lesson_quizzes_taken} lesson quizzes taken` },
+      { label: "avg readiness", value: `${a.avg_readiness}%`, sub: "org-wide, verified-completion aware" },
+      { label: "avg assessment score", value: `${a.avg_assessment_score}%`, sub: "diagnostic baseline" },
+      { label: "avg lesson quiz score", value: `${a.avg_lesson_quiz_score}%`, sub: "in-course reinforcement" },
+    ];
+    document.getElementById("statCards").innerHTML = kpis.map(k => `
+      <div class="kpi-card bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+        <p class="text-2xl font-extrabold text-blue-800">${k.value}</p>
+        <p class="text-xs text-slate-500 mt-1 font-medium">${k.label}</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">${k.sub}</p>
+      </div>`).join("");
+
+    // ---- training effectiveness bars ----
+    const eff = [
+      { label: "Diagnostic assessment (before training)", value: a.avg_assessment_score, hint: "Baseline competency at intake" },
+      { label: "Lesson quiz average (during/after training)", value: a.avg_lesson_quiz_score, hint: "Reinforcement inside roadmap courses" },
+    ];
+    document.getElementById("effectivenessBars").innerHTML = eff.map(e => `
+      <div>
+        <div class="flex justify-between text-sm mb-1"><span class="font-medium text-slate-700">${e.label}</span><span class="font-bold" style="color:${tierColor(e.value)}">${e.value}%</span></div>
+        <div class="bar-track h-3 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:${e.value}%; background:${tierColor(e.value)}"></div></div>
+        <p class="text-[11px] text-slate-400 mt-1">${e.hint}</p>
+      </div>`).join("");
+
+    // ---- competency distribution ----
+    const dist = [...a.competency_distribution].reverse();
     new Chart(document.getElementById("areaChart"), {
       type: "bar",
-      data: {
-        labels: dist.map(d => d.area),
+      data: { labels: dist.map(d => d.area),
         datasets: [{ label: "avg score", data: dist.map(d => d.avg_score),
-                     backgroundColor: dist.map(d => d.avg_score >= 70 ? "#10b981" : d.avg_score >= 40 ? "#f59e0b" : "#ef4444") }]
-      },
+                     backgroundColor: dist.map(d => tierColor(d.avg_score)) }] },
       options: { indexAxis: "y", maintainAspectRatio: false, plugins: { legend: { display: false } },
                  scales: { x: { suggestedMax: 100 } } }
     });
 
-    new Chart(document.getElementById("completionChart"), {
-      type: "bar",
-      data: {
-        labels: a.course_completions.map(c => c.course),
-        datasets: [{ label: "completions", data: a.course_completions.map(c => c.completions), backgroundColor: "#1a6fd4" }]
-      },
-      options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    // ---- course completions ----
+    if (a.course_completions.length) {
+      new Chart(document.getElementById("completionChart"), {
+        type: "bar",
+        data: { labels: a.course_completions.map(c => c.course),
+          datasets: [{ label: "completions", data: a.course_completions.map(c => c.completions), backgroundColor: COLORS.brand, borderRadius: 6 }] },
+        options: { maintainAspectRatio: false, plugins: { legend: { display: false } },
+                   scales: { y: { ticks: { precision: 0 } } } }
+      });
+    } else {
+      document.getElementById("completionChart").parentElement.innerHTML =
+        '<p class="text-sm text-slate-400 mt-10 text-center">No fully verified course completions yet — completions appear here once officers finish every module of a course.</p>';
+    }
+
+    // ---- department breakdown ----
+    const deptPalette = ["#1a6fd4","#f59e0b","#10b981","#8b5cf6","#ef4444","#0ea5e9","#f472b6","#14b8a6","#a3a316","#6366f1"];
+    new Chart(document.getElementById("deptChart"), {
+      type: "doughnut",
+      data: { labels: a.department_sizes.map(d => d.department),
+        datasets: [{ data: a.department_sizes.map(d => d.users), backgroundColor: deptPalette }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: "right", labels: { boxWidth: 10, font: { size: 10 } } } } }
     });
 
+    // ---- readiness distribution (histogram-style buckets) ----
+    const buckets = [
+      { label: "0-20%", min: 0, max: 20 }, { label: "21-40%", min: 21, max: 40 },
+      { label: "41-60%", min: 41, max: 60 }, { label: "61-80%", min: 61, max: 80 },
+      { label: "81-100%", min: 81, max: 100 },
+    ];
+    const counts = buckets.map(b => a.learner_readiness.filter(r => r.readiness_pct >= b.min && r.readiness_pct <= b.max).length);
+    new Chart(document.getElementById("readinessChart"), {
+      type: "bar",
+      data: { labels: buckets.map(b => b.label),
+        datasets: [{ data: counts, backgroundColor: buckets.map((b,i) => tierColor((b.min+b.max)/2)), borderRadius: 6 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { display: false } },
+                 scales: { y: { ticks: { precision: 0 } } } }
+    });
+
+    // ---- leaderboard ----
+    const rows = a.learner_readiness.slice(0, 12);
+    document.getElementById("leaderboard").innerHTML = `
+      <table class="w-full text-sm min-w-[560px]">
+        <thead><tr class="text-left text-xs text-slate-400 border-b border-slate-100">
+          <th class="py-2">Officer</th><th>Designation</th><th>Department</th><th>Readiness</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr class="border-b border-slate-50">
+              <td class="py-2 font-medium">${r.name}</td>
+              <td class="text-slate-500">${r.designation}</td>
+              <td class="text-slate-500">${r.department}</td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <div class="bar-track h-2 w-24 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:${r.readiness_pct}%; background:${tierColor(r.readiness_pct)}"></div></div>
+                  <span class="text-xs font-semibold" style="color:${tierColor(r.readiness_pct)}">${r.readiness_pct}%</span>
+                </div>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+
+    // ---- predictive needs ----
     const weakest = a.competency_distribution.slice(0, 5);
     document.getElementById("needsTable").innerHTML = `
       <table class="w-full">
@@ -81,7 +201,7 @@ if (requireAuth()) {
               <td class="py-2 font-medium">${w.area}</td>
               <td>${w.avg_score}</td>
               <td>${w.n}</td>
-              <td class="text-slate-500">Schedule targeted ${w.area} training wave via iGOT catalogue</td>
+              <td class="text-slate-500">Schedule targeted ${w.area} training wave via iGOT catalogue / NSSTA TPAC</td>
             </tr>`).join("")}
         </tbody>
       </table>`;
