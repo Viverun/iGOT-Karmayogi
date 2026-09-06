@@ -104,7 +104,7 @@ if (requireAuth()) {
   function play(v, title, mi, vi) {
     const flatIdx = flatLessons().findIndex(f => f.mi === mi && f.vi === vi);
     if (!lessonUnlocked(flatIdx)) {
-      alert("🔒 Pass the previous lesson's quiz (score 60+) to unlock this lesson.");
+      alert("🔒 Complete the previous lesson and pass its quiz (60%+) to unlock this lesson.");
       return;
     }
     document.getElementById("player").src = ytSrc(v);
@@ -187,6 +187,12 @@ if (requireAuth()) {
   window.toggleModule = toggleModule;
 
   async function load() {
+    const rm = await api("/api/roadmap");
+    if (!rm.assessment_done) {
+      alert("Take your competency assessment first — it unlocks your learning roadmap.");
+      location.href = "assessment.html";
+      return;
+    }
     const c = await api(`/api/roadmap/${courseKey}`);
     currentCourse = c;
     const doneCount = Object.keys(c.completed_modules || {}).length;
