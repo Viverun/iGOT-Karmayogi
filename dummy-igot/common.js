@@ -58,7 +58,7 @@ function renderFooter() {
   <div class="bg-[#0f2a5c] text-blue-100">
     <div class="mx-auto max-w-7xl px-6 py-10 grid md:grid-cols-3 gap-8 text-sm">
       <div>
-        <div class="flex items-center gap-2 mb-3"><span class="text-3xl">🪷</span><span class="font-bold text-white text-lg">कर्मण्योगी भारत</span></div>
+        <div class="flex items-center gap-2 mb-3"><img src="assets/logo.svg" alt="iGOT Karmayogi logo" class="h-11 w-11 shrink-0" /><span class="font-bold text-white text-lg">कर्मण्योगी भारत</span></div>
         <p>An initiative of Mission Karmayogi — NPCSCB, Government of India. Competency-driven capacity building of civil services, 'rule-based' to 'role-based'.</p>
       </div>
       <div>
@@ -91,7 +91,7 @@ function renderHeader(active) {
   <header class="sticky top-3 z-50 px-4">
     <nav class="mx-auto max-w-7xl bg-white rounded-full shadow-lg border border-slate-100 px-6 py-2.5 flex items-center gap-6">
       <a href="index.html" class="flex items-center gap-2 shrink-0">
-        <span class="text-3xl">🪷</span>
+        <img src="assets/logo.svg" alt="iGOT Karmayogi logo" class="h-11 w-11 shrink-0" />
         <span class="leading-tight">
           <span class="block font-bold text-xl text-blue-800">कर्मण्योगी भारत</span>
           <span class="block text-[10px] tracking-wide text-slate-500 border-t border-slate-300 mt-0.5">लोकलहित में कार्यतात्</span>
