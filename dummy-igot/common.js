@@ -132,7 +132,108 @@ function scoreColor(pct) {
 }
 function fmtMins(m) { return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`; }
 
-/* Auto-footer: append the official footer once DOM is ready on any page using common.js */
+/* ---- Learner chatbot widget: floating button + panel, shared across every
+   learner page. Answers questions and can swap a too-hard roadmap course for
+   its foundational alternative via POST /api/chat. Admin persona never sees it. */
+function renderChatWidget() {
+  if (document.getElementById("chatWidgetRoot")) return;
+  if (!getToken() || isAdminUser()) return;
+
+  const root = document.createElement("div");
+  root.id = "chatWidgetRoot";
+  root.innerHTML = `
+    <button id="chatFab" aria-label="Open learning assistant"
+            class="fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full bg-blue-700 text-white shadow-xl
+                   hover:bg-blue-800 flex items-center justify-center text-2xl transition-transform hover:scale-105">💬</button>
+    <div id="chatPanel" hidden
+         class="fixed bottom-24 right-6 z-[60] w-[340px] max-w-[92vw] h-[480px] max-h-[70vh] bg-white rounded-2xl
+                shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+      <div class="bg-blue-800 text-white px-4 py-3 flex items-center justify-between shrink-0">
+        <div>
+          <p class="font-semibold text-sm">Learning Assistant</p>
+          <p class="text-[11px] text-blue-200">Ask about your gaps, roadmap, or swap a hard course</p>
+        </div>
+        <button id="chatCloseBtn" class="text-blue-200 hover:text-white text-lg leading-none">✕</button>
+      </div>
+      <div id="chatMessages" class="flex-1 overflow-y-auto px-3 py-3 space-y-3 text-sm bg-slate-50"></div>
+      <div class="border-t border-slate-100 p-2.5 flex gap-2 shrink-0 bg-white">
+        <input id="chatInput" type="text" placeholder="e.g. the GNSS course is too hard"
+               class="flex-1 text-sm border border-slate-300 rounded-full px-3.5 py-2 focus:outline-none focus:border-blue-500" />
+        <button id="chatSendBtn" class="w-9 h-9 rounded-full bg-orange-400 hover:bg-orange-500 text-white shrink-0 flex items-center justify-center">➤</button>
+      </div>
+    </div>`;
+  document.body.appendChild(root);
+
+  const panel = document.getElementById("chatPanel");
+  const fab = document.getElementById("chatFab");
+  const msgBox = document.getElementById("chatMessages");
+  const input = document.getElementById("chatInput");
+  let historyLoaded = false;
+
+  function bubble(role, text, action) {
+    const mine = role === "user";
+    const el = document.createElement("div");
+    el.className = mine ? "flex justify-end" : "flex justify-start";
+    el.innerHTML = `
+      <div class="max-w-[85%] rounded-2xl px-3.5 py-2 ${mine ? "bg-blue-700 text-white rounded-br-sm" : "bg-white border border-slate-200 text-slate-700 rounded-bl-sm"}">
+        <p>${text.replace(/</g, "&lt;")}</p>
+        ${action ? `<p class="mt-1.5 text-[11px] font-medium ${mine ? "text-blue-100" : "text-emerald-600"}">✓ Roadmap updated</p>` : ""}
+      </div>`;
+    msgBox.appendChild(el);
+    msgBox.scrollTop = msgBox.scrollHeight;
+  }
+
+  async function loadHistory() {
+    if (historyLoaded) return;
+    historyLoaded = true;
+    try {
+      const h = await api("/api/chat/history");
+      if (!h.messages.length) {
+        bubble("assistant", "Hi! I can explain your skill gaps, recommend what to study next, or switch you to an easier version of a course you're finding too hard. What would you like to do?");
+      } else {
+        h.messages.forEach(m => bubble(m.role, m.content, m.action));
+      }
+    } catch (e) {
+      bubble("assistant", "Hi! Ask me about your gaps, roadmap, or say a course is too hard and I'll try to swap it for an easier one.");
+    }
+  }
+
+  async function send() {
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    bubble("user", text);
+    const typing = document.createElement("div");
+    typing.id = "chatTyping";
+    typing.className = "flex justify-start";
+    typing.innerHTML = `<div class="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-3.5 py-2 text-slate-400 text-xs">thinking…</div>`;
+    msgBox.appendChild(typing);
+    msgBox.scrollTop = msgBox.scrollHeight;
+    try {
+      const res = await api("/api/chat", { method: "POST", body: { message: text } });
+      document.getElementById("chatTyping")?.remove();
+      bubble("assistant", res.reply, res.action);
+      if (res.action && (res.action.type === "swap_course" || res.action.type === "revert_swap")) {
+        // roadmap changed server-side — refresh dashboard/roadmap views next time they load
+        sessionStorage.setItem("roadmap_dirty", "1");
+      }
+    } catch (e) {
+      document.getElementById("chatTyping")?.remove();
+      bubble("assistant", "Sorry, I couldn't reach the assistant service just now. Please try again in a moment.");
+    }
+  }
+
+  fab.addEventListener("click", () => {
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden) { loadHistory(); input.focus(); }
+  });
+  document.getElementById("chatCloseBtn").addEventListener("click", () => { panel.hidden = true; });
+  document.getElementById("chatSendBtn").addEventListener("click", send);
+  input.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+}
+
+/* Auto-footer + chat widget: append once DOM is ready on any page using common.js */
 if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", renderFooter);
+  document.addEventListener("DOMContentLoaded", renderChatWidget);
 }

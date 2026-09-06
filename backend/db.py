@@ -117,6 +117,22 @@ CREATE TABLE IF NOT EXISTS personalized_quizzes (
     generator TEXT NOT NULL,
     created_at TEXT DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS course_swaps (
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    original_key TEXT NOT NULL,     -- the core course the learner found difficult
+    replacement_key TEXT NOT NULL,  -- the foundational course now shown in its place
+    reason TEXT,                    -- learner's own words, from the chat
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, original_key)
+);
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    role TEXT NOT NULL,   -- 'user' | 'assistant'
+    content TEXT NOT NULL,
+    action_json TEXT,     -- structured action the assistant took, if any (e.g. a roadmap swap)
+    created_at TEXT DEFAULT (datetime('now'))
+);
 """
 
 # Single demo user for the presentation (no real authentication by design).

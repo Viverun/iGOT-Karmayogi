@@ -41,6 +41,53 @@ def log_event(user_id: int, etype: str, detail: dict):
     conn.close()
 
 
+def get_active_swaps(user_id: int) -> dict:
+    """original_key -> replacement_key for every course this learner has
+    downgraded to a foundational alternative."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT original_key, replacement_key FROM course_swaps WHERE user_id=?", (user_id,)).fetchall()
+    conn.close()
+    return {r["original_key"]: r["replacement_key"] for r in rows}
+
+
+def swap_roadmap_course(user_id: int, original_key: str, reason: str = "") -> dict:
+    """Downgrade a core roadmap course to its foundational easier_alt.
+    Called by the learner chatbot when someone says a course is too hard.
+    Returns the replacement course dict, or raises ValueError if the course
+    has no easier alternative defined."""
+    import roadmap_data
+    course = roadmap_data.get_course(original_key)
+    if not course:
+        raise ValueError(f"Unknown course '{original_key}'")
+    replacement_key = course.get("easier_alt")
+    if not replacement_key:
+        raise ValueError(f"'{course['name']}' has no foundational alternative yet")
+    replacement = roadmap_data.get_course(replacement_key)
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO course_swaps (user_id, original_key, replacement_key, reason, created_at) "
+        "VALUES (?,?,?,?,datetime('now')) "
+        "ON CONFLICT(user_id, original_key) DO UPDATE SET replacement_key=excluded.replacement_key, "
+        "reason=excluded.reason, created_at=datetime('now')",
+        (user_id, original_key, replacement_key, reason))
+    conn.commit()
+    conn.close()
+    log_event(user_id, "roadmap_course_swapped",
+              {"original": original_key, "replacement": replacement_key, "reason": reason})
+    return replacement
+
+
+def revert_roadmap_course(user_id: int, original_key: str):
+    """Undo a swap — go back to the core course."""
+    conn = get_db()
+    conn.execute("DELETE FROM course_swaps WHERE user_id=? AND original_key=?", (user_id, original_key))
+    conn.commit()
+    conn.close()
+    log_event(user_id, "roadmap_course_swap_reverted", {"original": original_key})
+    conn.close()
+
+
 def competency_vector(user_id: int, department_key: str, role_id: str | None = None) -> list:
     """Current vector (assessment + quizzes + completed-course boosts) vs targets."""
     targets = target_profile(department_key, role_id)
