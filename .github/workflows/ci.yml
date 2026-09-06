@@ -63,11 +63,12 @@ jobs:
 
   # ---------- CD: deploy (main pushes only, after CI passes) ----------
   deploy-frontend:
-    name: CD · Verify frontend → Vercel (git auto-deploy)
+    name: CD · Deploy frontend → Vercel
     if: github.event_name == 'push'
     needs: [backend, frontend]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Deploy to Vercel (production)
         working-directory: dummy-igot
         env:
