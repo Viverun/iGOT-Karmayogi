@@ -215,7 +215,7 @@ if (requireAuth() && !redirectIfAdmin()) {
           <span class="w-8 h-8 rounded-full font-bold flex items-center justify-center text-sm ${c.completed_modules && c.completed_modules[String(mi + 1)] !== undefined ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-50 text-blue-700'}">${c.completed_modules && c.completed_modules[String(mi + 1)] !== undefined ? '✔' : mi + 1}</span>
           <span class="flex-1">
             <span class="block text-sm font-semibold text-slate-800">${m.title}</span>
-            <span class="block text-xs text-slate-400">${m.videos.length} lessons</span>
+            <span class="block text-xs text-slate-400">${m.videos.length} lesson${m.videos.length === 1 ? '' : 's'}</span>
           </span>
         </button>
         <div id="mb${mi}" class="module-body ${mi === 0 ? '' : 'hidden'} border-t border-slate-100">

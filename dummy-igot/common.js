@@ -142,16 +142,16 @@ function renderChatWidget() {
   const root = document.createElement("div");
   root.id = "chatWidgetRoot";
   root.innerHTML = `
-    <button id="chatFab" aria-label="Open learning assistant"
+    <button id="chatFab" aria-label="Open Sahitya, your learning assistant"
             class="fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full bg-blue-700 text-white shadow-xl
                    hover:bg-blue-800 flex items-center justify-center text-2xl transition-transform hover:scale-105">💬</button>
-    <div id="chatPanel" hidden
+    <div id="chatPanel" style="display:none"
          class="fixed bottom-24 right-6 z-[60] w-[340px] max-w-[92vw] h-[480px] max-h-[70vh] bg-white rounded-2xl
-                shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+                shadow-2xl border border-slate-200 flex-col overflow-hidden">
       <div class="bg-blue-800 text-white px-4 py-3 flex items-center justify-between shrink-0">
         <div>
-          <p class="font-semibold text-sm">Learning Assistant</p>
-          <p class="text-[11px] text-blue-200">Ask about your gaps, roadmap, or swap a hard course</p>
+          <p class="font-semibold text-sm">Sahitya</p>
+          <p class="text-[11px] text-blue-200">Your learning assistant — ask about gaps, roadmap, or swap a hard course</p>
         </div>
         <button id="chatCloseBtn" class="text-blue-200 hover:text-white text-lg leading-none">✕</button>
       </div>
@@ -189,12 +189,12 @@ function renderChatWidget() {
     try {
       const h = await api("/api/chat/history");
       if (!h.messages.length) {
-        bubble("assistant", "Hi! I can explain your skill gaps, recommend what to study next, or switch you to an easier version of a course you're finding too hard. What would you like to do?");
+        bubble("assistant", "Namaste! I'm Sahitya. I can explain your skill gaps, recommend what to study next, or switch you to an easier version of a course you're finding too hard. What would you like to do?");
       } else {
         h.messages.forEach(m => bubble(m.role, m.content, m.action));
       }
     } catch (e) {
-      bubble("assistant", "Hi! Ask me about your gaps, roadmap, or say a course is too hard and I'll try to swap it for an easier one.");
+      bubble("assistant", "Namaste! I'm Sahitya. Ask me about your gaps, roadmap, or say a course is too hard and I'll try to swap it for an easier one.");
     }
   }
 
@@ -219,15 +219,17 @@ function renderChatWidget() {
       }
     } catch (e) {
       document.getElementById("chatTyping")?.remove();
-      bubble("assistant", "Sorry, I couldn't reach the assistant service just now. Please try again in a moment.");
+      bubble("assistant", "Sorry, I couldn't reach Sahitya's service just now. Please try again in a moment.");
     }
   }
 
-  fab.addEventListener("click", () => {
-    panel.hidden = !panel.hidden;
-    if (!panel.hidden) { loadHistory(); input.focus(); }
-  });
-  document.getElementById("chatCloseBtn").addEventListener("click", () => { panel.hidden = true; });
+  function panelOpen() { return panel.style.display !== "none"; }
+  function setPanelOpen(open) {
+    panel.style.display = open ? "flex" : "none";
+    if (open) { loadHistory(); input.focus(); }
+  }
+  fab.addEventListener("click", () => setPanelOpen(!panelOpen()));
+  document.getElementById("chatCloseBtn").addEventListener("click", () => setPanelOpen(false));
   document.getElementById("chatSendBtn").addEventListener("click", send);
   input.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
 }

@@ -110,6 +110,18 @@ def require_user(auth_header: Optional[str]) -> int:
     return row["user_id"]
 
 
+def require_admin(auth_header: Optional[str]) -> int:
+    """Same as require_user, but 403s unless the account's role is 'admin'.
+    Use for every org-wide/administrative endpoint (analytics, demo seeding)."""
+    user_id = require_user(auth_header)
+    conn = get_db()
+    row = conn.execute("SELECT role FROM users WHERE id=?", (user_id,)).fetchone()
+    conn.close()
+    if not row or row["role"] != "admin":
+        raise HTTPException(403, "Administrator access required")
+    return user_id
+
+
 # ---------- Auth (dummy) ----------
 
 class AuthBody(BaseModel):
@@ -540,14 +552,9 @@ def health():
 def admin_seed_demo_data(count: int = 60, authorization: Optional[str] = Header(None)):
     """DEMO-ONLY: populate the database with a synthetic officer roster so Org
     Analytics has enough spread to present (org-wide distributions, department
-    breakdowns, trending/hardest courses). Restricted to the seeded NSSTA
-    Administrator account. Safe to re-run — see seed_demo_analytics.py."""
-    user_id = require_user(authorization)
-    conn = get_db()
-    email = conn.execute("SELECT email FROM users WHERE id=?", (user_id,)).fetchone()["email"]
-    conn.close()
-    if email != "admin.nssta@mospi.gov.in":
-        raise HTTPException(403, "Only the Training Administrator account can seed demo data")
+    breakdowns, trending/hardest courses). Restricted to admin-role accounts.
+    Safe to re-run — see seed_demo_analytics.py."""
+    require_admin(authorization)
     import seed_demo_analytics
     seed_demo_analytics.seed(min(count, 150))
     return {"status": "seeded", "count": min(count, 150)}
@@ -1333,8 +1340,9 @@ def lesson_quiz_complete(course_key: str, module_no: int, video_no: int, body: C
             "readiness_pct": gaps["readiness_pct"]}
 
 
-CHAT_SYSTEM_PROMPT = """You are the learning assistant embedded in SETU-STAT, an AI skill-intelligence \
-platform for India's Official Statistical System (MoSPI/NSSTA). You help one specific officer with two things:
+CHAT_SYSTEM_PROMPT = """You are Sahitya, the learning assistant embedded in SETU-STAT, an AI skill-intelligence \
+platform for India's Official Statistical System (MoSPI/NSSTA). If the officer asks your name, say you're \
+Sahitya. You help one specific officer with two things:
 
 1. Answering questions about their own progress, gaps, recommended courses, TPAC pathways, or how the \
 platform works (assessments, roadmap, quizzes, Trainer Studio).
@@ -1439,15 +1447,15 @@ def chat(body: ChatBody, authorization: Optional[str] = Header(None)):
             reply = "Switched you back to the standard version of that course."
 
     if not reply:
-        # deterministic fallback so the chatbot is never silent, clearly labelled as such
+        # deterministic fallback so Sahitya is never silent, clearly labelled as such
         mode = "fallback"
         msg = body.message.lower()
         if any(w in msg for w in ["hard", "difficult", "tough", "confus", "easier", "simpler", "basic"]):
-            reply = ("I can swap a course for its foundational version if one exists — tell me which course "
-                     "(e.g. \"the GNSS course is too hard\") and I'll switch it for you.")
+            reply = ("I'm Sahitya — I can swap a course for its foundational version if one exists — tell me "
+                     "which course (e.g. \"the GNSS course is too hard\") and I'll switch it for you.")
         else:
-            reply = ("I can help with your competency gaps, roadmap, and TPAC recommendations — ask me "
-                     "things like \"what should I study next\" or \"switch me to an easier version of X\".")
+            reply = ("I'm Sahitya — I can help with your competency gaps, roadmap, and TPAC recommendations. "
+                     "Ask me things like \"what should I study next\" or \"switch me to an easier version of X\".")
 
     conn = get_db()
     conn.execute("INSERT INTO chat_messages (user_id, role, content, action_json) VALUES (?,?,?,?)",
@@ -1472,7 +1480,7 @@ def chat_history(authorization: Optional[str] = Header(None)):
 
 @app.get("/api/admin/analytics")
 def admin_analytics(authorization: Optional[str] = Header(None)):
-    require_user(authorization)
+    require_admin(authorization)
     import roadmap_data
     conn = get_db()
     area_stats = conn.execute(
@@ -1569,11 +1577,11 @@ def admin_analytics(authorization: Optional[str] = Header(None)):
         line = (f"\"{worst['course']}\" has the lowest average quiz score org-wide "
                 f"({worst['avg_quiz_score']}% across {worst['learners']} learners).")
         if swap_for_worst:
-            line += (f" {swap_for_worst['count']} officer(s) already asked the learning assistant for an "
+            line += (f" {swap_for_worst['count']} officer(s) already asked Sahitya (the learning assistant) for an "
                      f"easier version and were switched to \"{swap_for_worst['replacement']}\" — confirming "
                      f"this course is the org's top content-revision priority, not just a scoring artifact.")
         else:
-            line += " No officer has requested an easier alternative yet via the assistant, but the score alone warrants a content review."
+            line += " No officer has requested an easier alternative yet via Sahitya, but the score alone warrants a content review."
         insights.append(line)
     if trending_courses:
         top = trending_courses[0]
@@ -1581,7 +1589,7 @@ def admin_analytics(authorization: Optional[str] = Header(None)):
                         f"prioritise keeping its transcripts and quiz bank current over less-used courses.")
     if course_swap_requests:
         total_swaps = sum(s["count"] for s in course_swap_requests)
-        insights.append(f"The learning assistant has processed {total_swaps} difficulty-driven roadmap "
+        insights.append(f"Sahitya has processed {total_swaps} difficulty-driven roadmap "
                         f"adjustment(s) — direct evidence of adaptive, learner-initiated pathway changes, "
                         f"not just system-computed ones.")
 

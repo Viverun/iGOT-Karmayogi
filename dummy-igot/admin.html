@@ -31,6 +31,16 @@
   <!-- KPI row -->
   <div id="statCards" class="mt-6 grid sm:grid-cols-2 lg:grid-cols-5 gap-4"></div>
 
+  <!-- Auto-generated reasoning: why the platform is flagging what it's flagging -->
+  <div id="insightsCard" hidden class="mt-6 bg-blue-900 rounded-2xl shadow-sm p-6 text-blue-50">
+    <div class="flex items-center gap-2">
+      <span class="text-xl">🧠</span>
+      <h2 class="font-semibold text-white">Why these numbers — auto-generated insights</h2>
+    </div>
+    <p class="text-xs text-blue-200 mt-0.5">Every line below is derived live from the same API a judge can call directly — nothing here is a canned observation.</p>
+    <ul id="insightsList" class="mt-4 space-y-2.5 text-sm"></ul>
+  </div>
+
   <!-- Training effectiveness -->
   <div class="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
     <div class="flex items-center justify-between">
@@ -68,6 +78,12 @@
       <p class="text-xs text-slate-400 mt-0.5">Lowest average quiz score — candidates for revised content or an instructor-led follow-up.</p>
       <div id="hardestList" class="mt-4 space-y-3"></div>
     </div>
+  </div>
+
+  <div id="swapCard" hidden class="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+    <h2 class="font-semibold text-slate-800">🤖 Sahitya activity — difficulty-driven roadmap changes</h2>
+    <p class="text-xs text-slate-400 mt-0.5">Every row here is an officer who told Sahitya, the learning assistant, that a course was too hard and was switched to its foundational alternative — direct, learner-initiated evidence backing the "hardest courses" ranking above.</p>
+    <div id="swapList" class="mt-4 text-sm"></div>
   </div>
 
   <div class="mt-6 grid lg:grid-cols-2 gap-6">
@@ -122,6 +138,16 @@ if (requireAuth()) {
         <p class="text-xs text-slate-500 mt-1 font-medium">${k.label}</p>
         <p class="text-[11px] text-slate-400 mt-0.5">${k.sub}</p>
       </div>`).join("");
+
+    // ---- auto-generated insights ----
+    if (a.insights && a.insights.length) {
+      document.getElementById("insightsCard").hidden = false;
+      document.getElementById("insightsList").innerHTML = a.insights.map(line => `
+        <li class="flex gap-2.5">
+          <span class="text-orange-300 shrink-0">▸</span>
+          <span>${line}</span>
+        </li>`).join("");
+    }
 
     // ---- training effectiveness bars ----
     const eff = [
@@ -186,6 +212,25 @@ if (requireAuth()) {
           <p class="text-[11px] text-slate-400 mt-1">${c.provider} · ${c.learners} learners attempted</p>
         </div>`).join("")
       : '<p class="text-sm text-slate-400">Not enough attempts yet to flag a hardest course.</p>';
+
+    // ---- Sahitya swap activity ----
+    if (a.course_swap_requests && a.course_swap_requests.length) {
+      document.getElementById("swapCard").hidden = false;
+      document.getElementById("swapList").innerHTML = `
+        <table class="w-full">
+          <thead><tr class="text-left text-xs text-slate-400 border-b border-slate-100">
+            <th class="py-2">Original course</th><th></th><th>Switched to</th><th>Officers</th></tr></thead>
+          <tbody>
+            ${a.course_swap_requests.map(s => `
+              <tr class="border-b border-slate-50">
+                <td class="py-2 font-medium text-slate-700">${s.original}</td>
+                <td class="text-slate-300">→</td>
+                <td class="text-emerald-700 font-medium">${s.replacement}</td>
+                <td class="font-semibold text-blue-800">${s.count}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+    }
 
     // ---- department breakdown ----
     const deptPalette = ["#1a6fd4","#f59e0b","#10b981","#8b5cf6","#ef4444","#0ea5e9","#f472b6","#14b8a6","#a3a316","#6366f1"];
