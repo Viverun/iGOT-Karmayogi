@@ -132,7 +132,7 @@ if (requireAuth()) {
     if (row) row.querySelector(".lq-btn").disabled = false;
     refreshModuleBadges();
     // bring the unlocked Quiz button into view
-    const qbtn = document.getElementById("mq" + mi);
+    const qbtn = document.getElementById("mq" + playingLesson.mi);
     if (qbtn && !qbtn.disabled) qbtn.scrollIntoView({ behavior: "smooth", block: "center" });
   }
   window.markLessonDone = markLessonDone;
