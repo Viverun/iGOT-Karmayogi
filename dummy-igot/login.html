@@ -29,8 +29,9 @@
             bg-white border-l-4 border-orange-400 rounded-r-xl shadow-lg p-5">
   <p class="text-xs font-bold uppercase tracking-wide text-orange-500 mb-2">Demo mode</p>
   <p id="demoSideNoteText" class="text-sm text-slate-700 leading-relaxed">
-    For demonstration purposes, you are signing in as this particular user —
-    <span class="font-semibold text-blue-800">an Analyst at ADRIN, Department of Space &amp; ISRO HQ</span>.
+    For demonstration purposes, you are signing in as
+    <span class="font-semibold text-blue-800">a Deputy Advisor (Banking), Department of Financial Services</span> —
+    a read-only account that already has prior course and assessment history on record.
   </p>
   <p class="text-sm text-slate-700 mt-2">Go ahead and click <span class="font-semibold">Log in</span> to step into the solution.</p>
   <button onclick="this.parentElement.remove()" class="mt-3 text-xs text-slate-400 hover:text-slate-600 underline">Dismiss</button>
@@ -45,10 +46,10 @@
     <div class="mt-6">
       <label class="text-sm font-medium">Log in as <span class="text-red-500">*</span></label>
       <div class="mt-1 grid grid-cols-1 gap-3">
-        <button type="button" id="personaOfficerBtn" onclick="setPersona('officer')"
+        <button type="button" id="personaBankingBtn" onclick="setPersona('banking')"
                 class="persona-btn border border-blue-500 bg-blue-50 rounded-lg px-4 py-2.5 text-sm font-medium text-blue-800 text-left">
-          👤 Officer / Analyst
-          <span class="block text-[11px] font-normal text-slate-500">Learner experience — assessment, roadmap, quizzes</span>
+          🏦 Deputy Advisor (Banking) — read-only
+          <span class="block text-[11px] font-normal text-slate-500">Department of Financial Services — already onboarded, view-only account</span>
         </button>
       </div>
     </div>
@@ -88,16 +89,8 @@ setTimeout(() => {
 }, 2500);
 
 const PERSONAS = {
-  officer: {
-    email: "demo@gov.in", password: "demo123",
-    note: 'For demonstration purposes, you are signing in as this particular user — <span class="font-semibold text-blue-800">an Analyst at ADRIN, Department of Space &amp; ISRO HQ</span>.',
-  },
-  admin: {
-    email: "admin.nssta@mospi.gov.in", password: "demo123",
-    note: 'For demonstration purposes, you are signing in as <span class="font-semibold text-blue-800">the NSSTA Training Administrator</span> — this identity goes straight to the Organization Analytics dashboard instead of the personal learner view.',
-  },
   banking: {
-    email: "deputy@banking.gov.in", password: "demo123",
+    email: "deputyadvisor@banking.gov.in", password: "demo123",
     note: 'For demonstration purposes, you are signing in as <span class="font-semibold text-blue-800">a Deputy Advisor (Banking), Department of Financial Services</span> — a read-only account that already has prior course and assessment history on record.',
   },
 };
@@ -106,18 +99,10 @@ function setPersona(key) {
   const p = PERSONAS[key];
   document.getElementById("email").value = p.email;
   document.getElementById("password").value = p.password;
-  document.querySelectorAll(".persona-btn").forEach(b => {
-    b.classList.remove("border-blue-500", "bg-blue-50", "text-blue-800");
-    b.classList.add("border-slate-300", "text-slate-600");
-  });
-  const btnIdByKey = { officer: "personaOfficerBtn", admin: "personaAdminBtn", banking: "personaBankingBtn" };
-  const active = document.getElementById(btnIdByKey[key]);
-  active.classList.remove("border-slate-300", "text-slate-600");
-  active.classList.add("border-blue-500", "bg-blue-50", "text-blue-800");
   const textEl = document.getElementById("demoSideNoteText");
   if (textEl) textEl.innerHTML = p.note;
 }
-setPersona("officer");
+setPersona("banking");
 
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
