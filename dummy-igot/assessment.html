@@ -96,6 +96,9 @@ function render() {
   const answered = chosen[q.id] !== undefined;
   btn.disabled = !answered;
   btn.textContent = idx === questions.length - 1 ? "Submit Assessment" : "Next";
+  if (typeof translateDynamicElement === "function") {
+    translateDynamicElement(area, getCurrentLanguage());
+  }
 }
 
 function pick(i) {
@@ -141,6 +144,9 @@ async function submit() {
       <a href="dashboard.html" class="flex-1 text-center py-2.5 rounded-full border border-blue-200 text-blue-800 font-semibold hover:bg-blue-50">Back to Dashboard</a>
       <a href="dashboard.html" onclick="sessionStorage.removeItem('welcome_shown')" class="flex-1 text-center py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500">View My Roadmap →</a>
     </div>`;
+  if (typeof translateDynamicElement === "function") {
+    translateDynamicElement(r, getCurrentLanguage());
+  }
 }
 
 init();

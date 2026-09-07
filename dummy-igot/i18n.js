@@ -575,15 +575,144 @@ function t(text, lang) {
 }
 
 /**
- * Scan DOM text nodes and placeholder attributes and apply dictionary translations
+ * Cache for dynamic translations per language in sessionStorage
  */
-function applyTranslations(lang) {
-  lang = lang || getCurrentLanguage();
-  document.documentElement.lang = lang;
+function getTranslationCache(lang) {
+  try {
+    const raw = sessionStorage.getItem("igot_trans_cache_" + lang);
+    return raw ? JSON.parse(raw) : {};
+  } catch(e) {
+    return {};
+  }
+}
 
-  // Walk text nodes in body
+function saveTranslationCache(lang, cache) {
+  try {
+    sessionStorage.setItem("igot_trans_cache_" + lang, JSON.stringify(cache));
+  } catch(e) {}
+}
+
+/**
+ * Dynamically translate an array of texts using /api/translate endpoint with local caching
+ */
+async function translateDynamicTexts(texts, lang) {
+  lang = lang || getCurrentLanguage();
+  if (lang === "en" || !texts || !texts.length) return texts;
+
+  const cache = getTranslationCache(lang);
+  const toFetch = [];
+  const toFetchIndices = [];
+
+  const results = texts.map((t, idx) => {
+    const trimmed = (t || "").trim();
+    if (!trimmed || trimmed.length <= 1) return t;
+
+    // Check static dictionary first
+    if (I18N_DICTIONARY[trimmed] && I18N_DICTIONARY[trimmed][lang]) {
+      return I18N_DICTIONARY[trimmed][lang];
+    }
+    // Check local session cache
+    if (cache[trimmed]) {
+      return cache[trimmed];
+    }
+    // Need translation
+    toFetch.push(trimmed);
+    toFetchIndices.push(idx);
+    return t;
+  });
+
+  if (toFetch.length > 0) {
+    let handled = false;
+    // 1. Try backend /api/translate first
+    try {
+      const apiBase = window.IGOT_API_BASE || (["localhost", "127.0.0.1"].includes(location.hostname) ? "http://localhost:8001" : "https://igot-karmayogi-zs8h.onrender.com");
+      const resp = await fetch(apiBase + "/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texts: toFetch, target_lang: lang })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const translatedList = data.translated || [];
+        translatedList.forEach((trans, i) => {
+          const original = toFetch[i];
+          if (trans && trans !== original) {
+            cache[original] = trans;
+            results[toFetchIndices[i]] = trans;
+          }
+        });
+        saveTranslationCache(lang, cache);
+        handled = true;
+      }
+    } catch(err) {
+      // Backend not running or offline, proceed to client-side direct translation
+    }
+
+    // 2. Client-side fallback via Google GTX API directly (runs in browser, fast, no CORS issues)
+    if (!handled) {
+      await Promise.all(toFetch.map(async (text, i) => {
+        try {
+          const q = encodeURIComponent(text.slice(0, 500));
+          const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${lang}&dt=t&q=${q}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data[0]) {
+              const trans = data[0].map(s => s[0]).join("");
+              if (trans) {
+                cache[text] = trans;
+                results[toFetchIndices[i]] = trans;
+              }
+            }
+          }
+        } catch(e) {
+          // Fallback to MyMemory if GTX fails
+          try {
+            const q = encodeURIComponent(text.slice(0, 500));
+            const url = `https://api.mymemory.translated.net/get?q=${q}&langpair=en|${lang}`;
+            const res = await fetch(url);
+            if (res.ok) {
+              const data = await res.json();
+              const trans = data.responseData && data.responseData.translatedText;
+              if (trans && !trans.startsWith("MYMEMORY WARNING")) {
+                cache[text] = trans;
+                results[toFetchIndices[i]] = trans;
+              }
+            }
+          } catch(e2) {}
+        }
+      }));
+      saveTranslationCache(lang, cache);
+    }
+  }
+
+  return results;
+}
+window.translateDynamicTexts = translateDynamicTexts;
+
+/**
+ * Translate a container element's contents dynamically (including text nodes and placeholders)
+ */
+async function translateDynamicElement(container, lang) {
+  if (!container) return;
+  lang = lang || getCurrentLanguage();
+  if (lang === "en") {
+    // Restore original text if preserved
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    while (walker.nextNode()) {
+      if (walker.currentNode.__origText) {
+        walker.currentNode.nodeValue = walker.currentNode.__origText;
+      }
+    }
+    container.querySelectorAll('[data-orig-text]').forEach(el => {
+      el.textContent = el.getAttribute('data-orig-text');
+    });
+    return;
+  }
+
+  // 1. Gather all text nodes that are not inside code editors or scripts
   const walker = document.createTreeWalker(
-    document.body,
+    container,
     NodeFilter.SHOW_TEXT,
     {
       acceptNode: function(node) {
@@ -591,10 +720,10 @@ function applyTranslations(lang) {
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
         const tag = parent.tagName.toLowerCase();
-        if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'textarea') {
+        if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'textarea' || tag === 'pre' || tag === 'code') {
           return NodeFilter.FILTER_REJECT;
         }
-        if (parent.closest('#monaco-editor-container') || parent.closest('#editor-container')) {
+        if (parent.closest('#monaco-editor-container') || parent.closest('#editor-container') || parent.closest('.monaco-editor')) {
           return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_ACCEPT;
@@ -607,39 +736,56 @@ function applyTranslations(lang) {
     textNodes.push(walker.currentNode);
   }
 
+  const textsToTranslate = [];
+  const nodesToTranslate = [];
+
   textNodes.forEach(node => {
-    const raw = node.nodeValue.trim();
     if (!node.__origText) {
       node.__origText = node.nodeValue;
     }
     const orig = node.__origText.trim();
-    if (I18N_DICTIONARY[orig]) {
-      if (lang === 'en') {
-        node.nodeValue = node.__origText;
-      } else if (I18N_DICTIONARY[orig][lang]) {
-        node.nodeValue = node.__origText.replace(orig, I18N_DICTIONARY[orig][lang]);
-      }
+    if (I18N_DICTIONARY[orig] && I18N_DICTIONARY[orig][lang]) {
+      node.nodeValue = node.__origText.replace(orig, I18N_DICTIONARY[orig][lang]);
+    } else if (orig.length > 1) {
+      textsToTranslate.push(orig);
+      nodesToTranslate.push(node);
     }
   });
 
-  // Also translate common buttons, links, inputs
-  document.querySelectorAll('input[placeholder], button, a, span, p, h1, h2, h3').forEach(el => {
-    if (el.children.length === 0) {
-      const text = el.textContent.trim();
-      if (I18N_DICTIONARY[text]) {
-        if (!el.getAttribute('data-orig-text')) {
-          el.setAttribute('data-orig-text', text);
-        }
-        const orig = el.getAttribute('data-orig-text');
-        if (lang === 'en') {
-          el.textContent = orig;
-        } else if (I18N_DICTIONARY[orig] && I18N_DICTIONARY[orig][lang]) {
-          el.textContent = I18N_DICTIONARY[orig][lang];
-        }
+  if (textsToTranslate.length > 0) {
+    const translated = await translateDynamicTexts(textsToTranslate, lang);
+    translated.forEach((trans, i) => {
+      const node = nodesToTranslate[i];
+      if (node && trans) {
+        node.nodeValue = node.__origText.replace(textsToTranslate[i], trans);
       }
+    });
+  }
+
+  // Also translate input placeholders
+  container.querySelectorAll('input[placeholder]').forEach(async input => {
+    const ph = input.getAttribute('placeholder');
+    if (!input.getAttribute('data-orig-ph')) {
+      input.setAttribute('data-orig-ph', ph);
     }
+    const orig = input.getAttribute('data-orig-ph');
+    const [trans] = await translateDynamicTexts([orig], lang);
+    if (trans) input.setAttribute('placeholder', trans);
   });
 }
+window.translateDynamicElement = translateDynamicElement;
+
+/**
+ * Scan DOM text nodes and placeholder attributes and apply dictionary translations
+ */
+async function applyTranslations(lang) {
+  lang = lang || getCurrentLanguage();
+  document.documentElement.lang = lang;
+
+  // Walk text nodes in body
+  await translateDynamicElement(document.body, lang);
+}
+window.applyTranslations = applyTranslations;
 
 /**
  * Render the language selector dropdown component
@@ -719,7 +865,43 @@ if (typeof window !== "undefined") {
   document.addEventListener("DOMContentLoaded", function() {
     const lang = getCurrentLanguage();
     if (lang !== "en") {
-      setTimeout(() => applyTranslations(lang), 50);
+      setTimeout(() => applyTranslations(lang), 100);
     }
+  });
+
+  // Observe dynamically added modals and popup elements
+  let debounceTimeout = null;
+  const observer = new MutationObserver(mutations => {
+    const lang = getCurrentLanguage();
+    if (lang === "en") return;
+
+    let hasSignificantNewNodes = false;
+    for (const mutation of mutations) {
+      if (mutation.addedNodes.length > 0) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Ignore Monaco editor internals or script/style
+            if (node.closest && (node.closest('#monaco-editor-container') || node.closest('#editor-container') || node.closest('.monaco-editor'))) {
+              continue;
+            }
+            if (['SCRIPT', 'STYLE', 'TEXTAREA'].includes(node.tagName)) continue;
+            hasSignificantNewNodes = true;
+            break;
+          }
+        }
+      }
+      if (hasSignificantNewNodes) break;
+    }
+
+    if (hasSignificantNewNodes) {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(() => {
+        applyTranslations(lang);
+      }, 350);
+    }
+  });
+
+  document.addEventListener("DOMContentLoaded", function() {
+    observer.observe(document.body, { childList: true, subtree: true });
   });
 }

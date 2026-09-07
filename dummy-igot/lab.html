@@ -244,6 +244,9 @@ if (requireAuth() && !redirectIfAdmin()) {
     nb.disabled = idx === problems.length - 1;
     nb.textContent = idx === problems.length - 1 ? 'Last Problem' : 'Next Problem →';
     updateSubmitButton();
+    if (typeof translateDynamicElement === "function") {
+      translateDynamicElement(document.querySelector('.problem-card'), getCurrentLanguage());
+    }
   }
   window.showProblem = showProblem;
 

@@ -97,6 +97,68 @@ def course_to_content(c: dict) -> dict:
     }
 
 
+class TranslateRequest(BaseModel):
+    texts: list[str]
+    target_lang: str  # hi, bn, te, ta, mr, gu, kn, ml, pa, etc.
+
+# In-memory translation cache to avoid duplicate calls and maximize speed
+TRANSLATION_CACHE: dict[str, str] = {}
+
+def _translate_single_text(text: str, target: str) -> str:
+    clean_text = (text or "").strip()
+    if not clean_text or len(clean_text) <= 1:
+        return clean_text
+
+    cache_key = f"{target}:{clean_text}"
+    if cache_key in TRANSLATION_CACHE:
+        return TRANSLATION_CACHE[cache_key]
+
+    import urllib.request
+    import urllib.parse
+    import json
+
+    # 1. Primary: Google Translate GTX endpoint (ultra-fast, unlimited, high accuracy for Indian languages)
+    try:
+        q = urllib.parse.quote(clean_text[:1000])
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target}&dt=t&q={q}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if data and isinstance(data, list) and data[0]:
+                trans = "".join([seg[0] for seg in data[0] if seg and seg[0]])
+                if trans:
+                    TRANSLATION_CACHE[cache_key] = trans
+                    return trans
+    except Exception:
+        pass
+
+    # 2. Fallback: MyMemory API
+    try:
+        q = urllib.parse.quote(clean_text[:500])
+        url = f"https://api.mymemory.translated.net/get?q={q}&langpair=en|{target}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            trans = data.get("responseData", {}).get("translatedText")
+            if trans and not trans.startswith("MYMEMORY WARNING"):
+                TRANSLATION_CACHE[cache_key] = trans
+                return trans
+    except Exception:
+        pass
+
+    return clean_text
+
+@app.post("/api/translate")
+def translate_texts(body: TranslateRequest):
+    """Dynamic translation endpoint for quizzes, AI questions, popups, and dynamic content."""
+    if not body.texts or body.target_lang in ("en", "", None):
+        return {"translated": body.texts}
+
+    target = body.target_lang.lower().strip()
+    results = [_translate_single_text(t, target) for t in body.texts]
+    return {"translated": results}
+
+
 def require_user(auth_header: Optional[str]) -> int:
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(401, "Missing bearer token")
