@@ -159,7 +159,7 @@ ADMIN_USER = {
 # main.py's require_writable_user) — this account can browse but not submit.
 BANKING_USER = {
     "name": "Ananya Iyer",
-    "email": "deputy.advisor.banking@dfs.gov.in",
+    "email": "deputy@banking.gov.in",
     "password": "demo123",
     "designation": "Deputy Advisor (Banking)",
     "department": "Department of Financial Services (Banking Division)",
@@ -196,6 +196,8 @@ def init_db():
         (ADMIN_USER["name"], ADMIN_USER["email"], ADMIN_USER["password"],
          ADMIN_USER["designation"], ADMIN_USER["department"]),
     )
+    conn.execute("UPDATE users SET email = ? WHERE email = 'deputy.advisor.banking@dfs.gov.in'",
+                 (BANKING_USER["email"],))
     banking_is_new = conn.execute(
         "SELECT 1 FROM users WHERE email = ?", (BANKING_USER["email"],)).fetchone() is None
     conn.execute(
