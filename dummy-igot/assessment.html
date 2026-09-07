@@ -57,7 +57,7 @@
 </main>
 
 <script>
-const API = window.IGOT_API_BASE || (["localhost", "127.0.0.1"].includes(location.hostname) ? "http://localhost:8001" : "https://igot-karmayogi-zs8h.onrender.com");
+const API = window.IGOT_API_BASE || "https://igot-karmayogi-zs8h.onrender.com";
 const token = localStorage.getItem("igot_token");
 if (!token) location.href = "login.html";
 
