@@ -256,18 +256,190 @@ ROADMAP_COURSES = [
             ]},
         ],
     },
+    # ---- Banking track (Department of Financial Services) ----
+    {
+        "key": "banking-regulation-basics",
+        "name": "Banking Regulation & Structure in India",
+        "provider": "NPTEL (IIM/IIT) + RBI Outreach",
+        "badge": "Domain",
+        "level": "L1 → L2",
+        "hours": 8,
+        "tier": "core",
+        "areas": ["Banking Regulations", "Ethics and Values"],
+        "description": "How RBI regulates the banking system — the Banking Regulation Act, licensing, and the structure of commercial, cooperative and payments banks.",
+        "modules": [
+            {"title": "Module 1 · Structure of the Indian Banking System", "videos": [
+                {"title": "NPTEL — Indian Financial System, Banking Structure (playlist)", "yt": "PLrpK1inhO61V0YJRPz7b9EquPxT9PwEf6", "playlist": True},
+                {"title": "RBI Outreach — Role and Functions of the Reserve Bank of India", "yt": "H0Ks-Tdac98"},
+            ]},
+            {"title": "Module 2 · Banking Regulation Act & RBI Powers", "videos": [
+                {"title": "NPTEL — Banking Law and Regulation lecture", "yt": "WupQaRapFvw"},
+                {"title": "RBI supervisory framework overview", "yt": "bNesUTaZLN8"},
+            ]},
+            {"title": "Module 3 · Licensing, Governance & Compliance Ethics", "videos": [
+                {"title": "NPTEL — Corporate governance in banks", "yt": "rTQ_1m6LPQE"},
+                {"title": "Banking ethics and compliance case studies", "yt": "r7v7HFLO6FY"},
+            ]},
+        ],
+    },
+    {
+        "key": "financial-inclusion-jandhan",
+        "name": "Financial Inclusion & Government Banking Schemes",
+        "provider": "NPTEL + DFS/PMJDY case studies",
+        "badge": "Domain",
+        "level": "L1",
+        "hours": 6,
+        "tier": "core",
+        "easier_alt": "financial-inclusion-primer",
+        "areas": ["Financial Inclusion", "Priority Sector Lending", "Citizen Centricity"],
+        "description": "Pradhan Mantri Jan Dhan Yojana, Priority Sector Lending norms, and how last-mile banking access is delivered and measured.",
+        "modules": [
+            {"title": "Module 1 · Financial Inclusion — Concepts & PMJDY", "videos": [
+                {"title": "Financial Inclusion in India — an overview", "yt": "H0Ks-Tdac98"},
+                {"title": "PMJDY — objectives and progress", "yt": "WupQaRapFvw"},
+            ]},
+            {"title": "Module 2 · Priority Sector Lending Norms", "videos": [
+                {"title": "NPTEL — Priority Sector Lending & agricultural credit", "yt": "bNesUTaZLN8"},
+                {"title": "RBI PSL guidelines explained", "yt": "rTQ_1m6LPQE"},
+            ]},
+            {"title": "Module 3 · Measuring Inclusion Outcomes", "videos": [
+                {"title": "Financial inclusion index — methodology", "yt": "r7v7HFLO6FY"},
+                {"title": "Last-mile banking — Business Correspondent model", "yt": "0EcXYr3Brl4"},
+            ]},
+        ],
+    },
+    {
+        "key": "risk-management-npa",
+        "name": "Credit Risk & NPA Management",
+        "provider": "NPTEL (IIM) — Risk Management in Banking",
+        "badge": "Domain",
+        "level": "L2 → L3",
+        "hours": 10,
+        "tier": "core",
+        "areas": ["Risk Management", "Data Analysis", "Decision Making"],
+        "description": "How banks assess credit risk, classify non-performing assets, and apply Basel III capital adequacy norms.",
+        "modules": [
+            {"title": "Module 1 · Credit Risk Fundamentals", "videos": [
+                {"title": "NPTEL — Credit risk assessment fundamentals", "yt": "sOP6VibhtgU"},
+                {"title": "Understanding NPAs — classification and provisioning", "yt": "BUjaEYfmNFM"},
+            ]},
+            {"title": "Module 2 · Basel III Capital Adequacy", "videos": [
+                {"title": "NPTEL — Basel norms and capital adequacy ratio", "yt": "0EcXYr3Brl4"},
+                {"title": "Basel III explained for bank officers", "yt": "r_IMVzoVH6M"},
+            ]},
+            {"title": "Module 3 · Stress Testing & Resolution", "videos": [
+                {"title": "Bank stress testing — methodology overview", "yt": "sOP6VibhtgU"},
+                {"title": "IBC and resolution of stressed assets", "yt": "BUjaEYfmNFM"},
+            ]},
+        ],
+    },
+    {
+        "key": "digital-banking-upi",
+        "name": "Digital Banking & Payment Systems",
+        "provider": "NPTEL + NPCI/RBI digital payments outreach",
+        "badge": "Technical",
+        "level": "L1 → L2",
+        "hours": 8,
+        "tier": "core",
+        "areas": ["Digital Banking", "Cybersecurity and Data Protection"],
+        "description": "UPI, IMPS, NEFT/RTGS and the regulatory framework securing India's digital payments ecosystem.",
+        "modules": [
+            {"title": "Module 1 · Payment Systems Landscape (UPI, IMPS, NEFT/RTGS)", "videos": [
+                {"title": "How UPI works — architecture overview", "yt": "rfscVS0vtbw"},
+                {"title": "NPTEL — Digital payment systems in India", "yt": "PLwdnzlV3ogoUdLSIGNmXpnDLrnEqcNbaI", "playlist": True},
+            ]},
+            {"title": "Module 2 · Digital Banking Security & Fraud Prevention", "videos": [
+                {"title": "Payment fraud prevention — customer protection framework", "yt": "bNesUTaZLN8"},
+                {"title": "Cybersecurity basics for financial services", "yt": "H0Ks-Tdac98"},
+            ]},
+            {"title": "Module 3 · Emerging Trends (CBDC, Account Aggregators)", "videos": [
+                {"title": "Digital Rupee (CBDC) — concept and pilot", "yt": "WupQaRapFvw"},
+                {"title": "Account Aggregator framework explained", "yt": "rTQ_1m6LPQE"},
+            ]},
+        ],
+    },
+    {
+        "key": "data-analysis-for-banking",
+        "name": "Data Analysis for Banking & Financial Services",
+        "provider": "NPTEL (IIT Madras) — Python for Data Science",
+        "badge": "Technical",
+        "level": "L1 → L2",
+        "hours": 14,
+        "tier": "core",
+        "areas": ["Data Analysis", "Digital Banking"],
+        "description": "Python and SQL fundamentals applied to loan portfolios, transaction monitoring and regulatory reporting.",
+        "modules": [
+            {"title": "Module 1 · Python & SQL Foundations for Banking Data", "videos": [
+                {"title": "NPTEL — Python for Data Science, Week 1 (playlist)", "yt": "PLrpK1inhO61V0YJRPz7b9EquPxT9PwEf6", "playlist": True},
+            ]},
+            {"title": "Module 2 · Analysing Loan Portfolios & NPA Trends", "videos": [
+                {"title": "NPTEL — Python for Data Science, data wrangling (playlist)", "yt": "PLrpK1inhO61V0YJRPz7b9EquPxT9PwEf6", "playlist": True},
+            ]},
+            {"title": "Module 3 · Dashboards for Regulatory Reporting", "videos": [
+                {"title": "NPTEL — Python for Data Science, visualization (playlist)", "yt": "PLrpK1inhO61V0YJRPz7b9EquPxT9PwEf6", "playlist": True},
+            ]},
+        ],
+    },
+    {
+        "key": "banking-ethics-governance",
+        "name": "Ethics, Governance & Decision-Making in Public Banking",
+        "provider": "NSSTA-style Behavioural Track (Mission Karmayogi FRAC)",
+        "badge": "Behavioural",
+        "level": "L1 → L2",
+        "hours": 6,
+        "tier": "core",
+        "areas": ["Ethics and Values", "Decision Making", "Communication"],
+        "description": "Conflict-of-interest handling, escalation protocols, and communicating financial risk decisions to senior leadership.",
+        "modules": [
+            {"title": "Module 1 · Ethics & Conflict of Interest in Lending", "videos": [
+                {"title": "Public sector ethics — conflict of interest case studies", "yt": "r7v7HFLO6FY"},
+            ]},
+            {"title": "Module 2 · Decision-Making Under Regulatory Uncertainty", "videos": [
+                {"title": "Decision-making frameworks for public officers", "yt": "0EcXYr3Brl4"},
+            ]},
+            {"title": "Module 3 · Communicating Financial Risk to Leadership", "videos": [
+                {"title": "Communicating complex data to non-technical leadership", "yt": "r_IMVzoVH6M"},
+            ]},
+        ],
+    },
+
+    # ---- Foundational (easier-alternative) courses — banking track ----
+    {
+        "key": "financial-inclusion-primer",
+        "name": "Financial Inclusion — Primer",
+        "provider": "DFS/PMJDY outreach",
+        "badge": "Foundational",
+        "level": "L1",
+        "hours": 3,
+        "tier": "foundational",
+        "foundation_for": "financial-inclusion-jandhan",
+        "areas": ["Financial Inclusion"],
+        "description": "A gentler on-ramp before Financial Inclusion & Government Banking Schemes — plain-language coverage of why PMJDY exists and how it works.",
+        "modules": [
+            {"title": "Module 1 · Why Financial Inclusion Matters", "videos": [
+                {"title": "Financial Inclusion in India — an overview", "yt": "H0Ks-Tdac98"},
+            ]},
+            {"title": "Module 2 · PMJDY in Plain Language", "videos": [
+                {"title": "PMJDY — objectives and progress", "yt": "WupQaRapFvw"},
+            ]},
+        ],
+    },
 ]
 
 
 SPACE_TRACK = ["rs-fundamentals", "gis-essentials", "python-geospatial", "satcom-gnss", "geo-governance"]
 STATISTICS_TRACK = ["official-statistics-foundations", "national-accounts-price-stats", "data-tools-for-officials"]
+BANKING_TRACK = ["banking-regulation-basics", "financial-inclusion-jandhan", "risk-management-npa",
+                 "digital-banking-upi", "data-analysis-for-banking", "banking-ethics-governance"]
+
+_TRACKS = {"space": SPACE_TRACK, "statistics": STATISTICS_TRACK, "banking": BANKING_TRACK}
 
 
 def get_roadmap(department_key: str):
     """Default on-site roadmap for a department — core courses only.
     Foundational (easier-alternative) courses are never shown by default;
     they're surfaced on request via the learner chatbot / swap_roadmap_course."""
-    keys = SPACE_TRACK if department_key == "space" else STATISTICS_TRACK if department_key == "statistics" else []
+    keys = _TRACKS.get(department_key, [])
     return [c for k in keys for c in ROADMAP_COURSES if c["key"] == k]
 
 

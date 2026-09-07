@@ -106,6 +106,19 @@
         <a href="assessment.html" class="px-8 py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500">Take Assessment</a>
       </div>
     </div>
+    <div id="ws2history" class="p-8 text-center hidden">
+      <div class="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl">🔄</div>
+      <h2 class="mt-4 text-2xl font-bold text-[#1a3a6b]">Welcome back</h2>
+      <p class="mt-2 text-slate-600 text-sm">We found your existing service record — your previous course completions and
+        competency assessment have been fetched and added to your learning profile. Your dashboard, roadmap and gaps below
+        already reflect this history.</p>
+      <div class="mt-6 flex justify-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span><span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+      </div>
+      <div class="mt-5 flex justify-center">
+        <button onclick="closeWelcome()" class="px-8 py-2.5 rounded-full bg-blue-700 text-white font-semibold hover:bg-blue-800">Got it</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -122,15 +135,23 @@ if (requireAuth() && !redirectIfAdmin()) {
     document.getElementById("welcomeRole").textContent = [u.designation, u.department].filter(Boolean).join(", ") || "Karmayogi";
     overlay.classList.remove("hidden");
   }
-  function welcomeNext() { ws1.classList.add("hidden"); ws2.classList.remove("hidden"); }
-  function welcomePrev() { ws2.classList.add("hidden"); ws1.classList.remove("hidden"); }
+  function welcomeNext() {
+    ws1.classList.add("hidden");
+    const u = getUser();
+    (u && u.role === "readonly" ? ws2history : ws2).classList.remove("hidden");
+  }
+  function welcomePrev() {
+    ws2.classList.add("hidden"); ws2history.classList.add("hidden");
+    ws1.classList.remove("hidden");
+  }
   function closeWelcome() { overlay.classList.add("hidden"); }
   window.closeWelcome = closeWelcome;
 
   async function load() {
     const d = await api("/api/dashboard");
     const p = d.profile;
-    if (!d.assessment_done) showWelcomeOnce();
+    const u = getUser();
+    if (!d.assessment_done || (u && u.role === "readonly")) showWelcomeOnce();
     document.getElementById("profileName").textContent = p.name;
     document.getElementById("profileRole").textContent = [p.designation, p.department].filter(Boolean).join(", ") || "Karmayogi";
     document.getElementById("readinessPct").textContent = Math.min(100, d.readiness_pct) + "%";

@@ -141,6 +141,7 @@ function renderHeader(active) {
       </ul>
       <div class="ml-auto flex items-center gap-3">
         ${isAdminUser() ? '<span class="text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-100">Administrator</span>' : ''}
+        ${user && user.role === "readonly" ? '<span class="text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200">Read-only</span>' : ''}
         <span class="text-sm text-slate-600 hidden md:block">Namaste, <span class="font-semibold text-blue-800">${user ? user.name.split(" ")[0] : ""}</span></span>
         <button onclick="logout()" class="px-5 py-2 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500 text-sm">Log out</button>
       </div>

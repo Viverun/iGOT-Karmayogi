@@ -26,6 +26,7 @@ from gap_engine import chapters_for
 import gap_engine as ge
 import materials as mat_engine
 import llm
+import privacy
 from llm import KNOWLEDGE_QUIZ_PROMPT
 
 init_db()
@@ -122,6 +123,19 @@ def require_admin(auth_header: Optional[str]) -> int:
     return user_id
 
 
+def require_writable_user(auth_header: Optional[str]) -> int:
+    """Same as require_user, but 403s for 'readonly' accounts. Use on every
+    endpoint that submits an assessment/quiz, enrolls, completes a course,
+    or otherwise writes learner state."""
+    user_id = require_user(auth_header)
+    conn = get_db()
+    row = conn.execute("SELECT role FROM users WHERE id=?", (user_id,)).fetchone()
+    conn.close()
+    if row and row["role"] == "readonly":
+        raise HTTPException(403, "This account is read-only and cannot submit or modify data")
+    return user_id
+
+
 # ---------- Auth (dummy) ----------
 
 class AuthBody(BaseModel):
@@ -153,7 +167,7 @@ def register(body: AuthBody):
 def login(body: AuthBody):
     conn = get_db()
     row = conn.execute(
-        "SELECT id, name, email, designation, department FROM users WHERE email = ? AND password = ?",
+        "SELECT id, name, email, designation, department, role FROM users WHERE email = ? AND password = ?",
         (body.email, body.password),
     ).fetchone()
     if not row:
@@ -162,11 +176,14 @@ def login(body: AuthBody):
     token = secrets.token_hex(16)
     conn.execute("INSERT INTO tokens (token, user_id) VALUES (?,?)", (token, row["id"]))
     conn.commit()
+    has_history = conn.execute(
+        "SELECT 1 FROM assessment_results WHERE user_id = ?", (row["id"],)).fetchone() is not None
     conn.close()
     return {
         "access_token": token,  # dummy token, not a real JWT
         "token_type": "bearer",
-        "user": {k: row[k] for k in ("name", "email", "designation", "department")},
+        "user": {k: row[k] for k in ("name", "email", "designation", "department", "role")},
+        "has_history": has_history,
     }
 
 
@@ -209,7 +226,7 @@ def me(authorization: Optional[str] = Header(None)):
     user_id = require_user(authorization)
     conn = get_db()
     row = conn.execute(
-        "SELECT name, email, designation, department FROM users WHERE id = ?", (user_id,)
+        "SELECT name, email, designation, department, role FROM users WHERE id = ?", (user_id,)
     ).fetchone()
     conn.close()
     return row
@@ -261,7 +278,7 @@ class ChapterCompleteBody(BaseModel):
 
 @app.post("/api/enrollments")
 def enroll(body: EnrollBody, authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     if body.course_id not in COURSES_BY_ID:
         raise HTTPException(404, "Unknown course")
     conn = get_db()
@@ -483,7 +500,7 @@ def roadmap_module_quiz(course_key: str, module_no: int, authorization: Optional
 def roadmap_module_complete(course_key: str, module_no: int, body: ChapterCompleteBody,
                             authorization: Optional[str] = Header(None)):
     """Grade the module quiz against the stored transcript-grounded questions; feed memory."""
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     import roadmap_data
     c = roadmap_data.get_course(course_key)
     if not c:
@@ -646,7 +663,7 @@ def assessment_questions(authorization: Optional[str] = Header(None)):
 @app.post("/api/assessment/submit")
 def assessment_submit(body: SubmitBody, authorization: Optional[str] = Header(None)):
     """Grade against the question bank, store per-area scores, return them."""
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     conn = get_db()
     row = conn.execute("SELECT department FROM users WHERE id = ?", (user_id,)).fetchone()
     dept = row["department"] if row else ""
@@ -818,7 +835,7 @@ def chapter_quiz(course_id: str, chapter_no: int, authorization: Optional[str] =
 @app.post("/api/courses/{course_id}/chapters/{chapter_no}/complete")
 def chapter_complete(course_id: str, chapter_no: int, body: ChapterCompleteBody,
                      authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     c = COURSES_BY_ID.get(course_id)
     if not c:
         raise HTTPException(404, "Unknown course")
@@ -903,7 +920,7 @@ class QuizSubmitBody(BaseModel):
 
 @app.post("/api/quiz/personalized/submit")
 def personalized_quiz_submit(body: QuizSubmitBody, authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     _, key = _user_department(user_id)
     bank = {q["id"]: q for q in QUESTION_BANK[key]}
     per_area, results = {}, []
@@ -1023,7 +1040,7 @@ def semantic_course_search(q: str, top_k: int = 5, authorization: Optional[str] 
 @app.post("/api/materials/quizzes/{quiz_id}/grade")
 def grade_generated_quiz(quiz_id: int, body: QuizSubmitBody, authorization: Optional[str] = Header(None)):
     """Grade answers against a generated quiz (answers were stripped client-side)."""
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     conn = get_db()
     row = conn.execute("SELECT questions_json, generator FROM generated_quizzes WHERE id=? AND user_id=?",
                        (quiz_id, user_id)).fetchone()
@@ -1170,7 +1187,7 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
 
 @app.post("/api/personalized/{quiz_id}/grade")
 def personalized_grade(quiz_id: int, body: QuizSubmitBody, authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     conn = get_db()
     row = conn.execute("SELECT * FROM personalized_quizzes WHERE id=? AND user_id=?",
                        (quiz_id, user_id)).fetchone()
@@ -1297,7 +1314,7 @@ def lesson_quiz(course_key: str, module_no: int, video_no: int,
 @app.post("/api/roadmap/{course_key}/lesson/{module_no}/{video_no}/complete")
 def lesson_quiz_complete(course_key: str, module_no: int, video_no: int, body: ChapterCompleteBody,
                          authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     conn = get_db()
     row = conn.execute(
         "SELECT questions_json FROM lesson_quizzes WHERE user_id=? AND course_key=? AND module_no=? AND video_no=?",
@@ -1400,7 +1417,7 @@ class ChatBody(BaseModel):
 
 @app.post("/api/chat")
 def chat(body: ChatBody, authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     context = _chat_context(user_id)
 
     conn = get_db()
@@ -1412,7 +1429,8 @@ def chat(body: ChatBody, authorization: Optional[str] = Header(None)):
     reply, intent, course_key, mode = None, "general", None, "fallback"
     if llm.llm_available():
         try:
-            raw = llm.generate(CHAT_SYSTEM_PROMPT.format(context=context, message=body.message), max_tokens=1500)
+            safe_message = privacy.redact_pii(body.message)
+            raw = llm.generate(CHAT_SYSTEM_PROMPT.format(context=context, message=safe_message), max_tokens=1500)
             raw = raw.strip()
             if raw.startswith("```"):
                 raw = raw.split("```")[1]

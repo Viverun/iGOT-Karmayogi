@@ -49,7 +49,7 @@
     <!-- Persona switch: which demo identity to step into -->
     <div class="mt-6">
       <label class="text-sm font-medium">Register as <span class="text-red-500">*</span></label>
-      <div class="mt-1 grid grid-cols-2 gap-3">
+      <div class="mt-1 grid grid-cols-1 gap-3">
         <button type="button" id="personaOfficerBtn" onclick="setPersona('officer')"
                 class="persona-btn border border-blue-500 bg-blue-50 rounded-lg px-4 py-2.5 text-sm font-medium text-blue-800 text-left">
           👤 Officer / Analyst
@@ -59,6 +59,11 @@
                 class="persona-btn border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 text-left">
           🛡️ Training Administrator
           <span class="block text-[11px] font-normal text-slate-500">NSSTA/MoSPI — org analytics &amp; TPAC oversight</span>
+        </button>
+        <button type="button" id="personaBankingBtn" onclick="setPersona('banking')"
+                class="persona-btn border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 text-left">
+          🏦 Deputy Advisor (Banking) — read-only
+          <span class="block text-[11px] font-normal text-slate-500">Department of Financial Services — already onboarded, view-only account</span>
         </button>
       </div>
     </div>
@@ -133,6 +138,15 @@ const PERSONAS = {
     landing: "admin.html",
     note: 'For demonstration purposes, you are signing in as <span class="font-semibold text-blue-800">the NSSTA Training Administrator</span> — this identity goes straight to the Organization Analytics dashboard instead of the personal learner view.',
   },
+  banking: {
+    name: "Ananya Iyer", email: "deputy.advisor.banking@dfs.gov.in",
+    designation: "Deputy Advisor (Banking)",
+    department: "Department of Financial Services (Banking Division)",
+    org: "Department of Financial Services (DFS)",
+    landing: "dashboard.html",
+    readonly: true,
+    note: 'For demonstration purposes, you are signing in as <span class="font-semibold text-blue-800">a Deputy Advisor (Banking), Department of Financial Services</span> — a read-only account that already has prior course and assessment history on record.',
+  },
 };
 let persona = "officer";
 
@@ -145,12 +159,14 @@ function setPersona(key) {
   document.getElementById("f_org").title = p.org;
   document.getElementById("f_designation").value = p.designation;
   document.getElementById("f_email").value = p.email;
-  document.getElementById("registerBtn").textContent = key === "admin" ? "Sign in as Administrator" : "Register";
+  document.getElementById("registerBtn").textContent =
+    key === "admin" ? "Sign in as Administrator" : key === "banking" ? "Sign in as Deputy Advisor" : "Register";
   document.querySelectorAll(".persona-btn").forEach(b => {
     b.classList.remove("border-blue-500", "bg-blue-50", "text-blue-800");
     b.classList.add("border-slate-300", "text-slate-600");
   });
-  const active = document.getElementById(key === "admin" ? "personaAdminBtn" : "personaOfficerBtn");
+  const btnIdByKey = { admin: "personaAdminBtn", banking: "personaBankingBtn", officer: "personaOfficerBtn" };
+  const active = document.getElementById(btnIdByKey[key]);
   active.classList.remove("border-slate-300", "text-slate-600");
   active.classList.add("border-blue-500", "bg-blue-50", "text-blue-800");
   const noteEl = document.getElementById("demoSideNote");

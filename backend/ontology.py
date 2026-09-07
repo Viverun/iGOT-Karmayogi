@@ -24,6 +24,11 @@ COMPETENCY_TYPE = {
     "Legal and Regulatory Knowledge": "Domain",
     "Disaster Management": "Domain",
     "National Priorities": "Domain",
+    "Banking Regulations": "Domain",
+    "Financial Inclusion": "Domain",
+    "Risk Management": "Domain",
+    "Priority Sector Lending": "Domain",
+    "Digital Banking": "Functional",
     # Functional / Technical
     "Python": "Functional",
     "SQL": "Functional",
@@ -76,6 +81,18 @@ TARGET_PROFILES = {
         "Ethics and Values": 65,
         "Data Visualization": 55,
         "Policy Formulation": 60,
+    },
+    "banking": {
+        "Banking Regulations": 80,
+        "Risk Management": 80,
+        "Financial Inclusion": 65,
+        "Priority Sector Lending": 65,
+        "Digital Banking": 70,
+        "Data Analysis": 65,
+        "Cybersecurity and Data Protection": 70,
+        "Ethics and Values": 75,
+        "Decision Making": 70,
+        "Communication": 60,
     },
     "general": {
         "National Priorities": 60,
@@ -162,10 +179,22 @@ ROLE_PROFILES = {
             "Data Visualization": 70, "Ethics and Values": 80, "Communication": 75,
         },
     },
+    "deputy_advisor_banking": {
+        "title": "Deputy Advisor (Banking)",
+        "department": "Department of Financial Services (Banking Division)",
+        "grade": "Deputy Advisor (Level 11)",
+        "targets": {
+            "Banking Regulations": 85, "Risk Management": 85, "Financial Inclusion": 70,
+            "Priority Sector Lending": 70, "Digital Banking": 75, "Data Analysis": 65,
+            "Cybersecurity and Data Protection": 70, "Ethics and Values": 80,
+            "Decision Making": 75, "Communication": 60,
+        },
+    },
 }
 
 # designation/department keywords -> role_id (checked in order)
 _ROLE_KEYWORDS = [
+    ("deputy advisor (banking)", "deputy_advisor_banking"),
     ("computer centre", "dd_computer_centre"),
     ("national accounts", "director_nad"),
     ("survey design", "jd_sdrd"),
