@@ -1131,7 +1131,7 @@ async def upload_material(file: UploadFile = File(...), authorization: Optional[
     if len(text.strip()) < 100:
         raise HTTPException(400, "Material too short to generate a quiz from")
     conn = get_db()
-    cur = conn.execute("INSERT INTO materials (user_id, filename, text) VALUES (?,?,?)",
+    cur = conn.execute("INSERT INTO materials (user_id, filename, text) VALUES (?,?,?) RETURNING id",
                        (user_id, file.filename, text))
     conn.commit()
     mid = cur.lastrowid
@@ -1174,7 +1174,7 @@ def generate_material_quiz(material_id: int, n: int = 5, level: str = "Understan
     questions, generator, used_chunks = mat_engine.generate_quiz_from_material(
         row["text"], n=n, level=level, focus_query=focus_query, material_id=material_id)
     conn = get_db()
-    cur = conn.execute("INSERT INTO generated_quizzes (material_id, user_id, questions_json, generator) VALUES (?,?,?,?)",
+    cur = conn.execute("INSERT INTO generated_quizzes (material_id, user_id, questions_json, generator) VALUES (?,?,?,?) RETURNING id",
                        (material_id, user_id, json.dumps(questions), generator))
     conn.commit()
     quiz_id = cur.lastrowid
@@ -1333,7 +1333,7 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
 
     conn = get_db()
     cur = conn.execute(
-        "INSERT INTO personalized_quizzes (user_id, focus_areas_json, course_key, module_no, questions_json, generator) VALUES (?,?,?,?,?,?)",
+        "INSERT INTO personalized_quizzes (user_id, focus_areas_json, course_key, module_no, questions_json, generator) VALUES (?,?,?,?,?,?) RETURNING id",
         (user_id, json.dumps(weak), chosen["course_key"] if chosen else None,
          chosen["module_no"] if chosen else None, json.dumps(questions), generator))
     conn.commit()
@@ -1462,7 +1462,10 @@ def lesson_quiz(course_key: str, module_no: int, video_no: int,
                       "question": q["text"], "level": "L2"} for q in qs]
 
     conn = get_db()
-    conn.execute("INSERT OR REPLACE INTO lesson_quizzes (user_id, course_key, module_no, video_no, video_id, questions_json, generator) VALUES (?,?,?,?,?,?,?)",
+    conn.execute("INSERT INTO lesson_quizzes (user_id, course_key, module_no, video_no, video_id, questions_json, generator) "
+                 "VALUES (?,?,?,?,?,?,?) ON CONFLICT (user_id, course_key, module_no, video_no) DO UPDATE SET "
+                 "video_id=excluded.video_id, questions_json=excluded.questions_json, "
+                 "generator=excluded.generator, score=NULL",
                  (user_id, course_key, module_no, video_no, video["yt"], json.dumps(questions), generator))
     conn.commit()
     conn.close()
@@ -1662,7 +1665,7 @@ def admin_analytics(authorization: Optional[str] = Header(None)):
     import roadmap_data
     conn = get_db()
     area_stats = conn.execute(
-        "SELECT area, ROUND(AVG(score),1) AS avg_score, COUNT(*) AS n FROM user_competency GROUP BY area ORDER BY avg_score"
+        "SELECT area, ROUND(AVG(score)::numeric,1) AS avg_score, COUNT(*) AS n FROM user_competency GROUP BY area ORDER BY avg_score"
     ).fetchall()
     dept_stats = conn.execute(
         "SELECT u.department, COUNT(DISTINCT u.id) AS users FROM users u WHERE u.id != 0 GROUP BY u.department"
@@ -1685,18 +1688,18 @@ def admin_analytics(authorization: Optional[str] = Header(None)):
             roadmap_completions[course["name"]] = roadmap_completions.get(course["name"], 0) + 1
     total_users = conn.execute("SELECT COUNT(*) AS n FROM users WHERE id != 0").fetchone()["n"]
     assessed_users = conn.execute("SELECT COUNT(DISTINCT user_id) AS n FROM assessment_results WHERE user_id != 0").fetchone()["n"]
-    avg_assessment = conn.execute("SELECT ROUND(AVG(overall),1) AS a FROM ("
-                                   "SELECT (SELECT SUM(value) FROM json_each(scores_json)) / "
-                                   "(SELECT COUNT(*) FROM json_each(scores_json)) AS overall "
-                                   "FROM assessment_results)").fetchone()
+    avg_assessment = conn.execute("SELECT ROUND(AVG(overall)::numeric,1) AS a FROM ("
+                                   "SELECT (SELECT SUM((value::text)::numeric) FROM json_each(scores_json::json)) / "
+                                   "(SELECT COUNT(*) FROM json_each(scores_json::json)) AS overall "
+                                   "FROM assessment_results) sub").fetchone()
     lesson_scores = conn.execute(
-        "SELECT ROUND(AVG(score),1) AS avg_score, COUNT(*) AS n FROM lesson_quizzes WHERE score IS NOT NULL"
+        "SELECT ROUND(AVG(score)::numeric,1) AS avg_score, COUNT(*) AS n FROM lesson_quizzes WHERE score IS NOT NULL"
     ).fetchone()
     active_learners = conn.execute(
         "SELECT COUNT(DISTINCT user_id) AS n FROM lesson_quizzes WHERE score IS NOT NULL"
     ).fetchone()["n"]
     per_course = conn.execute(
-        "SELECT course_key, COUNT(DISTINCT user_id) AS learners, ROUND(AVG(score),1) AS avg_score "
+        "SELECT course_key, COUNT(DISTINCT user_id) AS learners, ROUND(AVG(score)::numeric,1) AS avg_score "
         "FROM lesson_quizzes WHERE score IS NOT NULL GROUP BY course_key"
     ).fetchall()
     swap_rows = conn.execute(

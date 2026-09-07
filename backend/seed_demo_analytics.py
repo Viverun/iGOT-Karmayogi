@@ -14,11 +14,10 @@ Usage: python3 seed_demo_analytics.py [count]   (default count: 60)
 """
 import json
 import random
-import sqlite3
 import sys
 
 sys.path.insert(0, ".")
-from db import DB_PATH, init_db
+from db import get_db, init_db
 
 random.seed(42)
 
@@ -98,8 +97,7 @@ def make_roster(n: int):
 
 def seed(n: int = 60):
     init_db()
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = get_db()
 
     for name, email, designation, department, dept_key, base_pct in make_roster(n):
         conn.execute(
@@ -146,18 +144,23 @@ def seed(n: int = 60):
                         break
                     quiz_score = max(15, min(100, base_pct - difficulty + random.randint(-10, 15)))
                     conn.execute(
-                        "INSERT OR REPLACE INTO lesson_quizzes "
+                        "INSERT INTO lesson_quizzes "
                         "(user_id, course_key, module_no, video_no, video_id, questions_json, generator, score) "
-                        "VALUES (?, ?, ?, ?, 'demo', '[]', 'llm', ?)",
+                        "VALUES (?, ?, ?, ?, 'demo', '[]', 'llm', ?) "
+                        "ON CONFLICT (user_id, course_key, module_no, video_no) DO UPDATE SET "
+                        "video_id=excluded.video_id, questions_json=excluded.questions_json, "
+                        "generator=excluded.generator, score=excluded.score",
                         (uid, course_key, m_no, v_no, quiz_score),
                     )
                     n_placed += 1
             if lessons_done >= total_lessons:
                 for m_no in range(1, len(module_layout) + 1):
                     conn.execute(
-                        "INSERT OR REPLACE INTO module_quizzes "
+                        "INSERT INTO module_quizzes "
                         "(user_id, course_key, module_no, questions_json, generator) "
-                        "VALUES (?, ?, ?, '[]', 'llm')",
+                        "VALUES (?, ?, ?, '[]', 'llm') "
+                        "ON CONFLICT (user_id, course_key, module_no) DO UPDATE SET "
+                        "questions_json=excluded.questions_json, generator=excluded.generator",
                         (uid, course_key, m_no),
                     )
                     mod_score = max(15, min(100, base_pct - difficulty + random.randint(-5, 10)))
