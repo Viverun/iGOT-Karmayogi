@@ -484,16 +484,24 @@ def roadmap_module_quiz(course_key: str, module_no: int, authorization: Optional
         questions = [{**q, **({"answer": bank_full[q["id"]]["answer"]} if q["id"] in bank_full else {}),
                       "question": q["text"], "level": "L2"} for q in qs]
 
+    # INSERT OR IGNORE + re-SELECT: if a concurrent request (e.g. a double
+    # click before the button disables) generated a different question set
+    # in the meantime, this guarantees every caller sees the SAME persisted
+    # questions — never a mix of one response's DOM with another's ids.
     conn = get_db()
-    conn.execute("INSERT INTO module_quizzes (user_id, course_key, module_no, questions_json, generator) VALUES (?,?,?,?,?)",
+    conn.execute("INSERT OR IGNORE INTO module_quizzes (user_id, course_key, module_no, questions_json, generator) "
+                 "VALUES (?,?,?,?,?)",
                  (user_id, course_key, module_no, json.dumps(questions), generator))
     conn.commit()
+    winner = conn.execute(
+        "SELECT questions_json, generator FROM module_quizzes WHERE user_id=? AND course_key=? AND module_no=?",
+        (user_id, course_key, module_no)).fetchone()
     conn.close()
     return {"course_key": course_key, "module_no": module_no,
-            "module_title": module["title"], "generator": generator,
+            "module_title": module["title"], "generator": winner["generator"],
             "transcript_videos_used": len(fetched),
             "questions": [{k: q[k] for k in ("id", "question", "options", "area", "level") if k in q}
-                          for q in questions]}
+                          for q in json.loads(winner["questions_json"])]}
 
 
 @app.post("/api/roadmap/{course_key}/module/{module_no}/complete")

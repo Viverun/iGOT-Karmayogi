@@ -251,10 +251,18 @@ if (requireAuth() && !redirectIfAdmin()) {
     refreshModuleBadges();
   }
 
+  // Guards against a double-click (or retry) firing a second overlapping
+  // request: only the LAST call's response is ever allowed to populate the
+  // DOM/currentQuiz, so they can never end up mismatched (radios rendered
+  // from one response, currentQuiz.questions from another).
+  let moduleQuizReqId = 0;
   async function startModuleQuiz(moduleNo) {
+    const myReq = ++moduleQuizReqId;
     lessonQuizState = null;
     currentModuleNo = moduleNo;
     const modal = document.getElementById("quizModal");
+    const trigger = document.getElementById(`mq${moduleNo - 1}`);
+    if (trigger) trigger.disabled = true;
     document.getElementById("quizTitle").textContent = "Loading quiz from lecture transcripts…";
     document.getElementById("quizMeta").textContent = "";
     document.getElementById("quizBody").innerHTML = "";
@@ -262,7 +270,14 @@ if (requireAuth() && !redirectIfAdmin()) {
     document.getElementById("quizControls").classList.add("hidden");
     modal.classList.remove("hidden");
 
-    currentQuiz = await api(`/api/roadmap/${courseKey}/module/${moduleNo}/quiz`, { method: "POST" });
+    let quiz;
+    try {
+      quiz = await api(`/api/roadmap/${courseKey}/module/${moduleNo}/quiz`, { method: "POST" });
+    } finally {
+      if (trigger) trigger.disabled = false;
+    }
+    if (myReq !== moduleQuizReqId) return;  // a newer call superseded this one — drop this response
+    currentQuiz = quiz;
     document.getElementById("quizTitle").textContent = `Module ${moduleNo}: ${currentQuiz.module_title}`;
     document.getElementById("quizMeta").textContent =
       "5 questions on this module · retaking keeps the same questions";
