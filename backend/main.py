@@ -199,11 +199,7 @@ def require_writable_user(auth_header: Optional[str]) -> int:
 
 
 def require_quiz_user(auth_header: Optional[str]) -> int:
-    """Allow authenticated learners to submit quizzes, including demo read-only accounts.
-
-    Quiz results update competency memory so pre-seeded demo personas can continue
-    learning without gaining access to enrollment or other account mutations.
-    """
+    """Allow authenticated learners to submit quizzes, including demo read-only accounts."""
     return require_user(auth_header)
 
 
@@ -297,10 +293,59 @@ def me(authorization: Optional[str] = Header(None)):
     user_id = require_user(authorization)
     conn = get_db()
     row = conn.execute(
-        "SELECT name, email, designation, department, role FROM users WHERE id = ?", (user_id,)
+        "SELECT name, email, designation, department, role, work_experience_years FROM users WHERE id = ?",
+        (user_id,)
     ).fetchone()
     conn.close()
     return row
+
+
+class ProfileUpdateBody(BaseModel):
+    designation: Optional[str] = None
+    department: Optional[str] = None
+    work_experience_years: Optional[int] = None
+
+
+@app.put("/api/profile")
+def update_profile(body: ProfileUpdateBody, authorization: Optional[str] = Header(None)):
+    """Officer-editable profile fields. Designation/department are re-resolved
+    against the role/department ontology on every read (see ontology.resolve_role_id),
+    so editing them here immediately changes the officer's competency targets and
+    which assessment/course track they see — no separate recompute step needed.
+
+    Persistent memory: the change itself is logged as a learning_event (the same
+    memory model assessments/quizzes/course completions feed), so "what changed
+    and when" survives alongside the rest of the officer's history.
+
+    Privacy: designation/department are free text an officer could (accidentally
+    or not) type PII into — both are passed through privacy.redact_pii() before
+    storage, the same guard already used on chatbot input, since department also
+    flows into the chatbot's LLM context (see _chat_context)."""
+    user_id = require_writable_user(authorization)
+    if body.work_experience_years is not None and not (0 <= body.work_experience_years <= 60):
+        raise HTTPException(400, "work_experience_years must be between 0 and 60")
+
+    updates = {}
+    if body.designation is not None:
+        updates["designation"] = privacy.redact_pii(body.designation.strip())[:200]
+    if body.department is not None:
+        updates["department"] = privacy.redact_pii(body.department.strip())[:200]
+    if body.work_experience_years is not None:
+        updates["work_experience_years"] = body.work_experience_years
+    if not updates:
+        raise HTTPException(400, "No fields to update")
+
+    conn = get_db()
+    set_clause = ", ".join(f"{k}=?" for k in updates)
+    conn.execute(f"UPDATE users SET {set_clause} WHERE id=?", (*updates.values(), user_id))
+    conn.commit()
+    row = conn.execute(
+        "SELECT name, email, designation, department, role, work_experience_years FROM users WHERE id=?",
+        (user_id,)).fetchone()
+    conn.close()
+
+    ge.log_event(user_id, "profile_updated", {"fields": list(updates.keys())})
+    return dict(row)
 
 
 # ---------- Catalogue (Sunbird-shaped) ----------
@@ -880,14 +925,18 @@ class SubmitBody(BaseModel):
 
 @app.get("/api/assessment/questions")
 def assessment_questions(authorization: Optional[str] = Header(None)):
-    """Questions picked by the logged-in user's department (no answers exposed)."""
+    """Questions for the logged-in user's department, personalized to their
+    resolved role and years of experience (see assessment.questions_for) —
+    no answers exposed. Role/experience are structured signals only; nothing
+    about the officer's identity is used here or ever reaches an LLM."""
     user_id = require_user(authorization)
+    dept, _, role_id = _user_context(user_id)
     conn = get_db()
-    row = conn.execute("SELECT department FROM users WHERE id = ?", (user_id,)).fetchone()
+    row = conn.execute("SELECT work_experience_years FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
-    dept = row["department"] if row else ""
+    experience_years = row["work_experience_years"] if row else 0
     qs = [{k: q[k] for k in ("id", "qtype", "area", "text", "options", "level")}
-          for q in questions_for(dept)]
+          for q in questions_for(dept, role_id, experience_years)]
     return {"department": dept, "department_key": department_key(dept), "questions": qs}
 
 
@@ -969,7 +1018,7 @@ def dashboard(authorization: Optional[str] = Header(None)):
     gaps = ge.compute_gaps(user_id, key, role_id)
     roadmap_row = get_db().execute("SELECT data_json FROM roadmaps WHERE user_id=?", (user_id,)).fetchone()
     conn = get_db()
-    profile = conn.execute("SELECT name, email, designation, department FROM users WHERE id=?",
+    profile = conn.execute("SELECT name, email, designation, department, role FROM users WHERE id=?",
                            (user_id,)).fetchone()
     enrollments = conn.execute(
         "SELECT e.id, e.course_id, e.status, e.progress_pct, e.updated_at FROM enrollments e WHERE e.user_id=?",
@@ -977,8 +1026,19 @@ def dashboard(authorization: Optional[str] = Header(None)):
     conn.close()
     enrollments = [{**dict(e), "course": course_to_content(COURSES_BY_ID[e["course_id"]])}
                    for e in enrollments if e["course_id"] in COURSES_BY_ID]
-    learning_hours = round(sum(e["course"]["duration"] for e in enrollments
-                               if e["status"] == "completed") / 3600, 1)
+    igot_hours = sum(e["course"]["duration"] for e in enrollments if e["status"] == "completed") / 3600
+
+    # roadmap courses (course_player.html's on-site track) live in chapter_progress,
+    # not the `enrollments` table — fold their hours/counts in too, using the same
+    # "graded quiz for every module" bar the gap engine already applies.
+    import roadmap_data
+    detail = ge.verified_completions_detail(user_id)
+    roadmap_courses = roadmap_data.get_roadmap(key)
+    roadmap_hours = sum(c["hours"] for c in roadmap_courses if c["key"] in detail["roadmap_keys"])
+    total_courses = len(roadmap_courses) + len(enrollments)
+    completed_courses = len(detail["roadmap_keys"]) + len([e for e in enrollments if e["status"] == "completed"])
+    learning_hours = round(igot_hours + roadmap_hours, 1)
+
     conn = get_db()
     assessment_done = conn.execute(
         "SELECT COUNT(*) AS n FROM assessment_results WHERE user_id=?", (user_id,)).fetchone()["n"] > 0
@@ -997,6 +1057,8 @@ def dashboard(authorization: Optional[str] = Header(None)):
         "roadmap": json.loads(roadmap_row["data_json"]) if roadmap_row else None,
         "enrollments": enrollments,
         "learning_hours": learning_hours,
+        "completed_courses": completed_courses,
+        "total_courses": total_courses,
     }
 
 

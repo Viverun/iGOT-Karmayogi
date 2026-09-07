@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
     designation TEXT DEFAULT '',
     department TEXT DEFAULT '',
     role TEXT NOT NULL DEFAULT 'official',
+    work_experience_years INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (NOW()::text)
 );
 CREATE TABLE IF NOT EXISTS tokens (
@@ -266,6 +267,7 @@ def init_db():
     conn.execute("ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS indexed INTEGER NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE lesson_quizzes ADD COLUMN IF NOT EXISTS score REAL")
     conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'official'")
+    conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS work_experience_years INTEGER NOT NULL DEFAULT 0")
     conn.commit()
 
     conn.execute(

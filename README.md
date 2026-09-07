@@ -60,24 +60,17 @@ directly via `login.html` (its history is meant to already exist, not be created
 # 1. backend deps (Python 3.12+)
 cd backend && pip install -r requirements.txt
 
-# 2. start the local Supabase database
-supabase start
-
-# 3. configure the local database and optional AI keys
-export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
-# Windows PowerShell:
-# $env:DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-# Optional keys go in backend/.env — never commit:
+# 2. configure keys (backend/.env — never commit)
 ANTHROPIC_API_KEY=...          # or OPENAI_API_KEY / OPENAI_BASE_URL for Azure OpenAI
 LLM_MODEL=claude-sonnet-4-20250514
 PINECONE_API_KEY=...
 PINECONE_INDEX=setu-stat
 # Without any LLM key, everything still works via the deterministic fallback generator.
 
-# 4. start backend (port 8001; 8000 is taken by unrelated apps on some machines)
+# 3. start backend (port 8001; 8000 is taken by unrelated apps on some machines)
 python3 -m uvicorn main:app --port 8001
 
-# 5. start frontend
+# 4. start frontend
 cd ../dummy-igot && python3 -m http.server 8090
 
 # open http://localhost:8090 → Login or Register with one of the demo personas above

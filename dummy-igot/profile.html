@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+<title>My Profile — iGOT Karmayogi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="common.js"></script>
+<style>
+  body { font-family: 'Poppins', sans-serif; }
+  .p-field:disabled { background: #f8fafc; color: #94a3b8; cursor: not-allowed; }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+<div id="header"></div>
+
+<main class="mx-auto max-w-5xl px-6 py-8 mb-16">
+  <div class="flex items-center justify-between flex-wrap gap-2">
+    <div>
+      <h1 class="text-2xl font-bold text-[#1a3a6b]">My Profile</h1>
+      <p class="text-sm text-slate-500 mt-1">Your registry details and learning summary.</p>
+    </div>
+    <div id="editControls" class="flex gap-2">
+      <button id="editBtn" onclick="setEditing(true)"
+        class="px-5 py-2 rounded-full border border-blue-200 text-blue-800 font-semibold text-sm hover:bg-blue-50">✎ Edit profile</button>
+      <button id="cancelBtn" onclick="setEditing(false)" class="hidden px-5 py-2 rounded-full border border-slate-300 text-slate-600 font-semibold text-sm hover:bg-slate-50">Cancel</button>
+      <button id="saveBtn" onclick="saveProfile()" class="hidden px-5 py-2 rounded-full bg-orange-400 text-white font-semibold text-sm hover:bg-orange-500">Save changes</button>
+    </div>
+  </div>
+
+  <p id="saveMsg" class="hidden mt-3 text-sm rounded-lg px-3 py-2"></p>
+
+  <section class="mt-4 grid lg:grid-cols-3 gap-6">
+    <!-- Identity card -->
+    <form id="profileForm" onsubmit="return false" class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-start gap-6">
+      <div id="avatar" class="w-20 h-20 shrink-0 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-2xl font-extrabold">–</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h2 id="pName" class="text-xl font-bold text-[#1a3a6b]">Loading…</h2>
+          <span id="roleBadge" class="hidden text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-full"></span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5">Name and email are your registry identity and can't be changed here.</p>
+
+        <dl class="mt-4 grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <div>
+            <dt class="text-xs text-slate-400 uppercase tracking-wide">Email</dt>
+            <dd id="pEmail" class="font-medium text-slate-800 mt-0.5">–</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-slate-400 uppercase tracking-wide">Role profile</dt>
+            <dd id="pRoleProfile" class="font-medium text-slate-800 mt-0.5">–</dd>
+          </div>
+          <div>
+            <label for="fDesignation" class="text-xs text-slate-400 uppercase tracking-wide">Designation</label>
+            <input id="fDesignation" disabled
+              class="p-field mt-0.5 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 font-medium text-slate-800 disabled:border-transparent disabled:px-0" />
+          </div>
+          <div>
+            <label for="fDepartment" class="text-xs text-slate-400 uppercase tracking-wide">Ministry / Department</label>
+            <input id="fDepartment" disabled
+              class="p-field mt-0.5 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 font-medium text-slate-800 disabled:border-transparent disabled:px-0" />
+          </div>
+          <div>
+            <label for="fExperience" class="text-xs text-slate-400 uppercase tracking-wide">Work experience (years)</label>
+            <input id="fExperience" type="number" min="0" max="60" disabled
+              class="p-field mt-0.5 w-full rounded-lg border border-slate-200 px-2.5 py-1.5 font-medium text-slate-800 disabled:border-transparent disabled:px-0" />
+            <p class="text-[11px] text-slate-400 mt-1">Paces your assessment's difficulty — junior officers start with foundational questions, senior officers with analytical ones.</p>
+          </div>
+          <div>
+            <dt class="text-xs text-slate-400 uppercase tracking-wide">Access level</dt>
+            <dd id="pRole" class="font-medium text-slate-800 mt-0.5">–</dd>
+          </div>
+        </dl>
+      </div>
+    </form>
+
+    <!-- Quick stats -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <h3 class="font-semibold text-slate-800">Learning summary</h3>
+      <div class="mt-4 space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-slate-500">Role readiness</span>
+          <span id="sReadiness" class="font-bold text-lg text-blue-800">–</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-slate-500">Courses completed</span>
+          <span id="sCourses" class="font-bold text-lg text-blue-800">–</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-slate-500">Learning hours</span>
+          <span id="sHours" class="font-bold text-lg text-blue-800">–</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-slate-500">Open skill gaps</span>
+          <span id="sGaps" class="font-bold text-lg text-blue-800">–</span>
+        </div>
+      </div>
+      <a href="dashboard.html" class="mt-5 block text-center px-5 py-2 rounded-full border border-blue-200 text-blue-800 font-semibold text-sm hover:bg-blue-50">
+        View full dashboard →
+      </a>
+    </div>
+  </section>
+
+  <!-- Competency snapshot -->
+  <section class="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+    <div class="flex items-baseline justify-between">
+      <h2 class="text-lg font-bold text-[#1a3a6b]">Competency Snapshot</h2>
+      <p class="text-xs text-slate-400">current score vs role target, by area</p>
+    </div>
+    <div id="competencyList" class="mt-4 space-y-3 text-sm"></div>
+  </section>
+
+  <p id="notice" class="hidden mt-6 text-sm text-slate-400 text-center"></p>
+</main>
+
+<script>
+if (requireAuth() && !redirectIfAdmin()) {
+  document.getElementById("header").innerHTML = renderHeader("profile.html");
+  let isReadonly = false;
+  let original = { designation: "", department: "", work_experience_years: 0 };
+
+  function initials(name) {
+    return (name || "?").split(" ").filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
+  }
+
+  function setEditing(on) {
+    if (isReadonly) return;
+    ["fDesignation", "fDepartment", "fExperience"].forEach(id => document.getElementById(id).disabled = !on);
+    document.getElementById("editBtn").classList.toggle("hidden", on);
+    document.getElementById("cancelBtn").classList.toggle("hidden", !on);
+    document.getElementById("saveBtn").classList.toggle("hidden", !on);
+    document.getElementById("saveMsg").classList.add("hidden");
+    if (!on) {
+      document.getElementById("fDesignation").value = original.designation;
+      document.getElementById("fDepartment").value = original.department;
+      document.getElementById("fExperience").value = original.work_experience_years;
+    }
+  }
+  window.setEditing = setEditing;
+
+  async function saveProfile() {
+    const btn = document.getElementById("saveBtn");
+    btn.disabled = true; btn.textContent = "Saving…";
+    const msg = document.getElementById("saveMsg");
+    try {
+      const body = {
+        designation: document.getElementById("fDesignation").value.trim(),
+        department: document.getElementById("fDepartment").value.trim(),
+        work_experience_years: parseInt(document.getElementById("fExperience").value || "0", 10),
+      };
+      const updated = await api("/api/profile", { method: "PUT", body });
+      original = { designation: updated.designation, department: updated.department,
+                   work_experience_years: updated.work_experience_years };
+      const u = getUser();
+      if (u) { u.designation = updated.designation; u.department = updated.department; localStorage.setItem("igot_user", JSON.stringify(u)); }
+      setEditing(false);
+      msg.textContent = "✓ Profile updated — your role targets and next assessment now reflect this.";
+      msg.className = "mt-3 text-sm rounded-lg px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100";
+      msg.classList.remove("hidden");
+      await load();
+    } catch (e) {
+      msg.textContent = e.message || "Couldn't save changes.";
+      msg.className = "mt-3 text-sm rounded-lg px-3 py-2 bg-red-50 text-red-700 border border-red-100";
+      msg.classList.remove("hidden");
+    }
+    btn.disabled = false; btn.textContent = "Save changes";
+  }
+  window.saveProfile = saveProfile;
+
+  async function load() {
+    const d = await api("/api/dashboard");
+    const p = d.profile;
+
+    document.getElementById("avatar").textContent = initials(p.name);
+    document.getElementById("pName").textContent = p.name;
+    document.getElementById("pEmail").textContent = p.email;
+    document.getElementById("pRoleProfile").textContent = p.role_id
+      ? p.role_id.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+      : "Department default";
+
+    original = { designation: p.designation || "", department: p.department || "",
+                 work_experience_years: p.work_experience_years || 0 };
+    document.getElementById("fDesignation").value = original.designation;
+    document.getElementById("fDepartment").value = original.department;
+    document.getElementById("fExperience").value = original.work_experience_years;
+
+    const role = p.role || "official";
+    isReadonly = role === "readonly";
+    document.getElementById("pRole").textContent =
+      role === "admin" ? "Administrator" : role === "readonly" ? "Read-only" : "Officer";
+    const badge = document.getElementById("roleBadge");
+    if (role !== "official") {
+      badge.textContent = role === "admin" ? "Administrator" : "Read-only";
+      badge.className = "text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-full " +
+        (role === "admin" ? "bg-orange-50 text-orange-600 border border-orange-100"
+                           : "bg-slate-100 text-slate-500 border border-slate-200");
+      badge.classList.remove("hidden");
+    }
+    if (isReadonly) document.getElementById("editControls").classList.add("hidden");
+
+    document.getElementById("sReadiness").textContent = Math.min(100, d.readiness_pct) + "%";
+    document.getElementById("sCourses").textContent = d.completed_courses + " / " + d.total_courses;
+    document.getElementById("sHours").textContent = d.learning_hours + "h";
+    document.getElementById("sGaps").textContent = d.top_gaps.length;
+
+    const list = document.getElementById("competencyList");
+    if (!d.assessment_done) {
+      list.innerHTML = '<p class="text-slate-400">Take your competency assessment to see this breakdown.</p>';
+    } else {
+      list.innerHTML = d.competency_vector.map(v => `
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="font-medium text-slate-700">${v.area} <span class="text-slate-400">(${v.type})</span></span>
+            <span class="text-slate-500">${v.current}/100 · target ${v.target}</span>
+          </div>
+          <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div class="h-2 ${v.gap > 0 ? 'bg-amber-400' : 'bg-emerald-500'} rounded-full" style="width:${Math.min(100, v.current)}%"></div>
+          </div>
+        </div>`).join("");
+    }
+
+    if (isReadonly) {
+      const n = document.getElementById("notice");
+      n.textContent = "This is a read-only account — profile details are fetched from your service record and cannot be edited here.";
+      n.classList.remove("hidden");
+    }
+  }
+
+  load().catch(e => showPageError(e.message));
+}
+</script>
+</body>
+</html>

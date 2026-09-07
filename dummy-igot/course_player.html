@@ -426,9 +426,17 @@ if (requireAuth() && !redirectIfAdmin()) {
     }
     const submitBtn = document.getElementById("quizSubmitBtn");
     submitBtn.disabled = true;
+    let r;
     try {
-      const r = await api(`/api/roadmap/${courseKey}/lesson/${lessonQuizState.moduleNo}/${lessonQuizState.videoNo}/complete`,
+      r = await api(`/api/roadmap/${courseKey}/lesson/${lessonQuizState.moduleNo}/${lessonQuizState.videoNo}/complete`,
         { method: "POST", body: { answers } });
+    } catch (e) {
+      const error = document.getElementById("quizError");
+      error.textContent = e.message || "Could not submit the quiz. Please try again.";
+      error.classList.remove("hidden");
+      submitBtn.disabled = false;
+      return;
+    }
     document.getElementById("quizControls").classList.add("hidden");
     const res = document.getElementById("quizResult");
     res.classList.remove("hidden");
@@ -448,12 +456,6 @@ if (requireAuth() && !redirectIfAdmin()) {
       </div>`;
     if (typeof translateDynamicElement === "function") {
       translateDynamicElement(res, getCurrentLanguage());
-    }
-    } catch (e) {
-      const error = document.getElementById("quizError");
-      error.textContent = e.message || "Could not submit the quiz. Please try again.";
-      error.classList.remove("hidden");
-      submitBtn.disabled = false;
     }
   }
   window.submitLessonQuiz = submitLessonQuiz;
@@ -477,8 +479,16 @@ if (requireAuth() && !redirectIfAdmin()) {
     }
     const submitBtn = document.getElementById("quizSubmitBtn");
     submitBtn.disabled = true;
+    let r;
     try {
-    const r = await api(`/api/roadmap/${courseKey}/module/${currentModuleNo}/complete`, { method: "POST", body: { answers } });
+      r = await api(`/api/roadmap/${courseKey}/module/${currentModuleNo}/complete`, { method: "POST", body: { answers } });
+    } catch (e) {
+      const error = document.getElementById("quizError");
+      error.textContent = e.message || "Could not submit the quiz. Please try again.";
+      error.classList.remove("hidden");
+      submitBtn.disabled = false;
+      return;
+    }
     document.getElementById("quizControls").classList.add("hidden");
     const res = document.getElementById("quizResult");
     res.classList.remove("hidden");
@@ -499,12 +509,6 @@ if (requireAuth() && !redirectIfAdmin()) {
     if (typeof translateDynamicElement === "function") {
       translateDynamicElement(res, getCurrentLanguage());
     }
-    } catch (e) {
-      const error = document.getElementById("quizError");
-      error.textContent = e.message || "Could not submit the quiz. Please try again.";
-      error.classList.remove("hidden");
-      submitBtn.disabled = false;
-    }
   }
   window.submitQuiz = submitQuiz;
 
@@ -522,6 +526,7 @@ if (requireAuth() && !redirectIfAdmin()) {
     const first = document.querySelector(".video-row");
     if (first) first.click();
   }).catch(e => showPageError(e.message));
+  window.__refreshRoadmapUI = () => load().catch(e => showPageError(e.message));
 }
 </script>
 </body>
