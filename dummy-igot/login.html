@@ -126,7 +126,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     if (!res.ok) throw new Error(data.detail || "Login failed");
     localStorage.setItem("igot_token", data.access_token);
     localStorage.setItem("igot_user", JSON.stringify(data.user));
-    location.href = "index.html";
+    location.href = "dashboard.html";
   } catch (err) {
     errEl.textContent = err.message;
     errEl.classList.remove("hidden");
