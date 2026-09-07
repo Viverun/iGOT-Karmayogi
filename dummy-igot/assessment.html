@@ -7,6 +7,7 @@
 <title>Competency Assessment — iGOT Karmayogi</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="i18n.js"></script>
 <style>
   body { font-family: 'Poppins', sans-serif; }
   .opt:hover { border-color: #1d4ed8; background: #eff6ff; }
@@ -24,7 +25,10 @@
         <span class="block text-[10px] text-slate-500 border-t border-slate-300 mt-0.5">लोकलहित में कार्यतात्</span>
       </span>
     </a>
-    <a href="index.html" class="ml-auto text-sm text-slate-500 hover:text-blue-700">← Back to home</a>
+    <div class="ml-auto flex items-center gap-3">
+      <script>document.write(renderLanguageDropdown());</script>
+      <a href="index.html" class="text-sm text-slate-500 hover:text-blue-700">← Back to home</a>
+    </div>
   </nav>
 </header>
 
@@ -53,7 +57,10 @@
 </main>
 
 <script>
-const API = window.IGOT_API_BASE || (["localhost", "127.0.0.1"].includes(location.hostname) ? "http://localhost:8001" : "https://igot-karmayogi-zs8h.onrender.com");
+const API = window.IGOT_API_BASE ||
+  (["localhost", "127.0.0.1"].includes(location.hostname)
+    ? "http://127.0.0.1:8001"
+    : "https://igot-karmayogi-zs8h.onrender.com");
 const token = localStorage.getItem("igot_token");
 if (!token) location.href = "login.html";
 
@@ -92,6 +99,9 @@ function render() {
   const answered = chosen[q.id] !== undefined;
   btn.disabled = !answered;
   btn.textContent = idx === questions.length - 1 ? "Submit Assessment" : "Next";
+  if (typeof translateDynamicElement === "function") {
+    translateDynamicElement(area, getCurrentLanguage());
+  }
 }
 
 function pick(i) {
@@ -137,6 +147,9 @@ async function submit() {
       <a href="dashboard.html" class="flex-1 text-center py-2.5 rounded-full border border-blue-200 text-blue-800 font-semibold hover:bg-blue-50">Back to Dashboard</a>
       <a href="dashboard.html" onclick="sessionStorage.removeItem('welcome_shown')" class="flex-1 text-center py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500">View My Roadmap →</a>
     </div>`;
+  if (typeof translateDynamicElement === "function") {
+    translateDynamicElement(r, getCurrentLanguage());
+  }
 }
 
 init();

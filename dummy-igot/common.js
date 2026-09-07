@@ -1,7 +1,13 @@
 /* Shared helpers for the iGOT Karmayogi prototype frontend */
+if (typeof document !== "undefined" && !document.querySelector('script[src*="i18n.js"]')) {
+  const i18nScript = document.createElement("script");
+  i18nScript.src = "i18n.js";
+  document.head.appendChild(i18nScript);
+}
+
 window.IGOT_API_BASE = window.IGOT_API_BASE ||
   (["localhost", "127.0.0.1"].includes(location.hostname)
-    ? "http://localhost:8001"
+    ? "http://127.0.0.1:8001"
     : "https://igot-karmayogi-zs8h.onrender.com");
 const API = window.IGOT_API_BASE;
 
@@ -121,10 +127,14 @@ function renderFooter() {
 
 function renderHeader(active) {
   const user = getUser();
+  const langDropdown = typeof renderLanguageDropdown === "function" ? renderLanguageDropdown() : "";
   const govtStrip = `
   <div class="mx-auto max-w-7xl mb-2 flex items-center justify-between text-[11px] font-medium px-6">
     <span class="text-slate-500">भारत सरकार · Government of India</span>
-    <span class="text-slate-500">Department of Personnel &amp; Training · Mission Karmayogi</span>
+    <div class="flex items-center gap-4">
+      <span class="text-slate-500 hidden sm:inline">Department of Personnel &amp; Training · Mission Karmayogi</span>
+      ${langDropdown}
+    </div>
   </div>`;
   return `${govtStrip}
   <header class="sticky top-3 z-50 px-4">
@@ -141,6 +151,7 @@ function renderHeader(active) {
       </ul>
       <div class="ml-auto flex items-center gap-3">
         ${isAdminUser() ? '<span class="text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-100">Administrator</span>' : ''}
+        ${user && user.role === "readonly" ? '<span class="text-[10px] font-bold tracking-wide uppercase px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200">Read-only</span>' : ''}
         <span class="text-sm text-slate-600 hidden md:block">Namaste, <span class="font-semibold text-blue-800">${user ? user.name.split(" ")[0] : ""}</span></span>
         <button onclick="logout()" class="px-5 py-2 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500 text-sm">Log out</button>
       </div>

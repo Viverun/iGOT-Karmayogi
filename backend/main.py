@@ -26,10 +26,11 @@ from gap_engine import chapters_for
 import gap_engine as ge
 import materials as mat_engine
 import llm
+import privacy
 from llm import KNOWLEDGE_QUIZ_PROMPT
 
 init_db()
-COURSES = json.loads((Path(__file__).parent / "data" / "courses.json").read_text())
+COURSES = json.loads((Path(__file__).parent / "data" / "courses.json").read_text(encoding="utf-8"))
 COURSES_BY_ID = {c["identifier"]: c for c in COURSES}
 
 app = FastAPI(title="Dummy iGOT Karmayogi API", version="0.1.0")
@@ -96,6 +97,68 @@ def course_to_content(c: dict) -> dict:
     }
 
 
+class TranslateRequest(BaseModel):
+    texts: list[str]
+    target_lang: str  # hi, bn, te, ta, mr, gu, kn, ml, pa, etc.
+
+# In-memory translation cache to avoid duplicate calls and maximize speed
+TRANSLATION_CACHE: dict[str, str] = {}
+
+def _translate_single_text(text: str, target: str) -> str:
+    clean_text = (text or "").strip()
+    if not clean_text or len(clean_text) <= 1:
+        return clean_text
+
+    cache_key = f"{target}:{clean_text}"
+    if cache_key in TRANSLATION_CACHE:
+        return TRANSLATION_CACHE[cache_key]
+
+    import urllib.request
+    import urllib.parse
+    import json
+
+    # 1. Primary: Google Translate GTX endpoint (ultra-fast, unlimited, high accuracy for Indian languages)
+    try:
+        q = urllib.parse.quote(clean_text[:1000])
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target}&dt=t&q={q}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if data and isinstance(data, list) and data[0]:
+                trans = "".join([seg[0] for seg in data[0] if seg and seg[0]])
+                if trans:
+                    TRANSLATION_CACHE[cache_key] = trans
+                    return trans
+    except Exception:
+        pass
+
+    # 2. Fallback: MyMemory API
+    try:
+        q = urllib.parse.quote(clean_text[:500])
+        url = f"https://api.mymemory.translated.net/get?q={q}&langpair=en|{target}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            trans = data.get("responseData", {}).get("translatedText")
+            if trans and not trans.startswith("MYMEMORY WARNING"):
+                TRANSLATION_CACHE[cache_key] = trans
+                return trans
+    except Exception:
+        pass
+
+    return clean_text
+
+@app.post("/api/translate")
+def translate_texts(body: TranslateRequest):
+    """Dynamic translation endpoint for quizzes, AI questions, popups, and dynamic content."""
+    if not body.texts or body.target_lang in ("en", "", None):
+        return {"translated": body.texts}
+
+    target = body.target_lang.lower().strip()
+    results = [_translate_single_text(t, target) for t in body.texts]
+    return {"translated": results}
+
+
 def require_user(auth_header: Optional[str]) -> int:
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(401, "Missing bearer token")
@@ -120,6 +183,28 @@ def require_admin(auth_header: Optional[str]) -> int:
     if not row or row["role"] != "admin":
         raise HTTPException(403, "Administrator access required")
     return user_id
+
+
+def require_writable_user(auth_header: Optional[str]) -> int:
+    """Same as require_user, but 403s for 'readonly' accounts. Use on every
+    endpoint that submits an assessment/quiz, enrolls, completes a course,
+    or otherwise writes learner state."""
+    user_id = require_user(auth_header)
+    conn = get_db()
+    row = conn.execute("SELECT role FROM users WHERE id=?", (user_id,)).fetchone()
+    conn.close()
+    if row and row["role"] == "readonly":
+        raise HTTPException(403, "This account is read-only and cannot submit or modify data")
+    return user_id
+
+
+def require_quiz_user(auth_header: Optional[str]) -> int:
+    """Allow authenticated learners to submit quizzes, including demo read-only accounts.
+
+    Quiz results update competency memory so pre-seeded demo personas can continue
+    learning without gaining access to enrollment or other account mutations.
+    """
+    return require_user(auth_header)
 
 
 # ---------- Auth (dummy) ----------
@@ -153,7 +238,7 @@ def register(body: AuthBody):
 def login(body: AuthBody):
     conn = get_db()
     row = conn.execute(
-        "SELECT id, name, email, designation, department FROM users WHERE email = ? AND password = ?",
+        "SELECT id, name, email, designation, department, role FROM users WHERE email = ? AND password = ?",
         (body.email, body.password),
     ).fetchone()
     if not row:
@@ -162,11 +247,14 @@ def login(body: AuthBody):
     token = secrets.token_hex(16)
     conn.execute("INSERT INTO tokens (token, user_id) VALUES (?,?)", (token, row["id"]))
     conn.commit()
+    has_history = conn.execute(
+        "SELECT 1 FROM assessment_results WHERE user_id = ?", (row["id"],)).fetchone() is not None
     conn.close()
     return {
         "access_token": token,  # dummy token, not a real JWT
         "token_type": "bearer",
-        "user": {k: row[k] for k in ("name", "email", "designation", "department")},
+        "user": {k: row[k] for k in ("name", "email", "designation", "department", "role")},
+        "has_history": has_history,
     }
 
 
@@ -184,7 +272,7 @@ def reset_demo(body: ResetDemoBody):
         uid = row["id"]
         for table in ("tokens", "learning_events", "chapter_progress", "lesson_quizzes",
                       "personalized_quizzes", "assessment_results", "user_competency",
-                      "enrollments", "roadmaps"):
+                      "enrollments", "roadmaps", "coding_labs"):
             conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (uid,))
         conn.commit()
     conn.close()
@@ -209,7 +297,7 @@ def me(authorization: Optional[str] = Header(None)):
     user_id = require_user(authorization)
     conn = get_db()
     row = conn.execute(
-        "SELECT name, email, designation, department FROM users WHERE id = ?", (user_id,)
+        "SELECT name, email, designation, department, role FROM users WHERE id = ?", (user_id,)
     ).fetchone()
     conn.close()
     return row
@@ -261,7 +349,7 @@ class ChapterCompleteBody(BaseModel):
 
 @app.post("/api/enrollments")
 def enroll(body: EnrollBody, authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     if body.course_id not in COURSES_BY_ID:
         raise HTTPException(404, "Unknown course")
     conn = get_db()
@@ -375,7 +463,8 @@ def get_roadmap_course(course_key: str, authorization: Optional[str] = Header(No
 MODULE_QUIZ_PROMPT = """You are a subject-matter examiner for India's capacity-building programmes.
 A learner just finished the module "{module_title}" (course: {course_name}) watching these video lectures.
 Using ONLY the lecture transcripts below, write {n} multiple-choice questions that precisely test
-comprehension of what the lectures actually taught. Tag each question with its difficulty level:
+comprehension of what the lectures actually taught. All questions, options, and explanations MUST be in clear English.
+Tag each question with its difficulty level:
 "L1" (easy/recall), "L2" (medium/applied) or "L3" (hard/analytical) — include a mix, roughly 2 L1, 2 L2, 1 L3.
 For each question, set "area" to the CLOSEST match from this list: {areas}.
 Return STRICT JSON: a list of objects with fields:
@@ -467,23 +556,31 @@ def roadmap_module_quiz(course_key: str, module_no: int, authorization: Optional
         questions = [{**q, **({"answer": bank_full[q["id"]]["answer"]} if q["id"] in bank_full else {}),
                       "question": q["text"], "level": "L2"} for q in qs]
 
+    # INSERT OR IGNORE + re-SELECT: if a concurrent request (e.g. a double
+    # click before the button disables) generated a different question set
+    # in the meantime, this guarantees every caller sees the SAME persisted
+    # questions — never a mix of one response's DOM with another's ids.
     conn = get_db()
-    conn.execute("INSERT INTO module_quizzes (user_id, course_key, module_no, questions_json, generator) VALUES (?,?,?,?,?)",
+    conn.execute("INSERT OR IGNORE INTO module_quizzes (user_id, course_key, module_no, questions_json, generator) "
+                 "VALUES (?,?,?,?,?)",
                  (user_id, course_key, module_no, json.dumps(questions), generator))
     conn.commit()
+    winner = conn.execute(
+        "SELECT questions_json, generator FROM module_quizzes WHERE user_id=? AND course_key=? AND module_no=?",
+        (user_id, course_key, module_no)).fetchone()
     conn.close()
     return {"course_key": course_key, "module_no": module_no,
-            "module_title": module["title"], "generator": generator,
+            "module_title": module["title"], "generator": winner["generator"],
             "transcript_videos_used": len(fetched),
             "questions": [{k: q[k] for k in ("id", "question", "options", "area", "level") if k in q}
-                          for q in questions]}
+                          for q in json.loads(winner["questions_json"])]}
 
 
 @app.post("/api/roadmap/{course_key}/module/{module_no}/complete")
 def roadmap_module_complete(course_key: str, module_no: int, body: ChapterCompleteBody,
                             authorization: Optional[str] = Header(None)):
     """Grade the module quiz against the stored transcript-grounded questions; feed memory."""
-    user_id = require_user(authorization)
+    user_id = require_quiz_user(authorization)
     import roadmap_data
     c = roadmap_data.get_course(course_key)
     if not c:
@@ -543,9 +640,160 @@ def roadmap_module_complete(course_key: str, module_no: int, body: ChapterComple
             "readiness_pct": gaps["readiness_pct"]}
 
 
+# ---------- Hands-On Coding Lab endpoints ----------
+
+LAB_TRIGGER_MODULE = 1   # lab unlocks right after Module 1 so learners can test Hands-On Lab immediately
+
+
+class LabCompleteBody(BaseModel):
+    score: float          # 0-100: percentage of test cases the student passed
+    problems_passed: int  # how many individual problems were solved
+    problems_total: int   # total problems in the lab (always 3)
+    code_submitted: Optional[str] = None  # last student code (for review)
+
+
+@app.get("/api/roadmap/{course_key}/lab/{lab_no}")
+def get_lab(course_key: str, lab_no: int, authorization: Optional[str] = Header(None)):
+    """Return the lab problems & starter code.
+    Unlocks as soon as the student has completed and passed Module 1."""
+    user_id = require_user(authorization)
+    import roadmap_data
+    c = roadmap_data.get_course(course_key)
+    if not c:
+        raise HTTPException(404, "Course not found in your roadmap")
+    if "lab_after_module" not in c:
+        raise HTTPException(404, "This course does not have a hands-on lab")
+
+    # Check prerequisite: student must have passed at least Module 1
+    conn = get_db()
+    passed_modules = conn.execute(
+        "SELECT COUNT(*) AS n FROM chapter_progress "
+        "WHERE user_id=? AND course_id=? AND quiz_score >= 60",
+        (user_id, f"roadmap:{course_key}")
+    ).fetchone()["n"]
+    lab_row = conn.execute(
+        "SELECT score, passed FROM coding_labs WHERE user_id=? AND course_key=? AND lab_no=?",
+        (user_id, course_key, lab_no)
+    ).fetchone()
+    conn.close()
+
+    if passed_modules < LAB_TRIGGER_MODULE:
+        raise HTTPException(403, f"Complete and pass Module 1 first to unlock the Hands-On Lab")
+
+    lab_data = roadmap_data.CODING_LAB_PROBLEMS.get(course_key)
+    if not lab_data:
+        raise HTTPException(404, "Lab problems not found for this course")
+
+    # Strip test_runner from the response (it's backend-only for validation)
+    problems_out = []
+    for p in lab_data["problems"]:
+        problems_out.append({k: v for k, v in p.items() if k != "test_runner"})
+
+    return {
+        "course_key": course_key,
+        "lab_no": lab_no,
+        "title": lab_data["title"],
+        "subtitle": lab_data["subtitle"],
+        "course_name": c["name"],
+        "problems": problems_out,
+        "already_passed": bool(lab_row and lab_row["passed"]),
+        "previous_score": lab_row["score"] if lab_row else None,
+    }
+
+
+@app.get("/api/roadmap/{course_key}/lab/{lab_no}/status")
+def lab_status(course_key: str, lab_no: int, authorization: Optional[str] = Header(None)):
+    """Return lab lock/unlock/pass state for the course player sidebar."""
+    user_id = require_user(authorization)
+    import roadmap_data
+    c = roadmap_data.get_course(course_key)
+    if not c or "lab_after_module" not in c:
+        return {"has_lab": False}
+
+    conn = get_db()
+    passed_modules = conn.execute(
+        "SELECT COUNT(*) AS n FROM chapter_progress "
+        "WHERE user_id=? AND course_id=? AND quiz_score >= 60",
+        (user_id, f"roadmap:{course_key}")
+    ).fetchone()["n"]
+    lab_row = conn.execute(
+        "SELECT score, passed FROM coding_labs WHERE user_id=? AND course_key=? AND lab_no=?",
+        (user_id, course_key, lab_no)
+    ).fetchone()
+    conn.close()
+
+    unlocked = passed_modules >= LAB_TRIGGER_MODULE
+    passed = bool(lab_row and lab_row["passed"])
+    return {
+        "has_lab": True,
+        "lab_no": lab_no,
+        "unlocked": unlocked,
+        "passed": passed,
+        "score": lab_row["score"] if lab_row else None,
+        "trigger_after_module": LAB_TRIGGER_MODULE,
+        "modules_passed_so_far": passed_modules,
+    }
+
+
+@app.post("/api/roadmap/{course_key}/lab/{lab_no}/complete")
+def lab_complete(course_key: str, lab_no: int, body: LabCompleteBody,
+                 authorization: Optional[str] = Header(None)):
+    """Save lab score, credit competency points if passed (≥60%)."""
+    user_id = require_writable_user(authorization)
+    import roadmap_data
+    c = roadmap_data.get_course(course_key)
+    if not c or "lab_after_module" not in c:
+        raise HTTPException(404, "Lab not found for this course")
+
+    # Validate score range
+    score = max(0.0, min(100.0, float(body.score)))
+    passed = score >= 60.0
+
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO coding_labs (user_id, course_key, lab_no, code_submitted, score, passed) "
+        "VALUES (?,?,?,?,?,?) "
+        "ON CONFLICT(user_id, course_key, lab_no) DO UPDATE SET "
+        "code_submitted=excluded.code_submitted, score=excluded.score, "
+        "passed=excluded.passed, submitted_at=datetime('now')",
+        (user_id, course_key, lab_no, body.code_submitted, score, int(passed))
+    )
+    conn.commit()
+    conn.close()
+
+    # Credit competency points for passing the lab
+    if passed:
+        lab_areas = c.get("areas", [])
+        area_scores = {area: min(100, score) for area in lab_areas}
+        ge.update_competency(user_id, area_scores)
+        ge.log_event(user_id, "lab_completed",
+                     {"course_key": course_key, "lab_no": lab_no, "score": score,
+                      "areas": lab_areas})
+        _, key = _user_department(user_id)
+        gaps = ge.compute_gaps(user_id, key, _user_context(user_id)[2])
+        ge.build_roadmap(user_id, key, COURSES, gaps, completed_ids=_completed_ids(user_id))
+        readiness_pct = gaps["readiness_pct"]
+    else:
+        readiness_pct = None
+
+    return {
+        "score": score,
+        "passed": passed,
+        "problems_passed": body.problems_passed,
+        "problems_total": body.problems_total,
+        "readiness_pct": readiness_pct,
+        "message": (
+            "🎉 Lab passed! Module 3 is now unlocked. Competency points credited."
+            if passed else
+            f"Score {score:.0f}% — you need 60% to pass. At least {body.problems_total - body.problems_passed} more problem(s) to solve. Try again!"
+        ),
+    }
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "demo_user": DEMO_USER["email"], "courses": len(COURSES)}
+
 
 
 @app.post("/api/admin/seed-demo-data")
@@ -646,7 +894,7 @@ def assessment_questions(authorization: Optional[str] = Header(None)):
 @app.post("/api/assessment/submit")
 def assessment_submit(body: SubmitBody, authorization: Optional[str] = Header(None)):
     """Grade against the question bank, store per-area scores, return them."""
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     conn = get_db()
     row = conn.execute("SELECT department FROM users WHERE id = ?", (user_id,)).fetchone()
     dept = row["department"] if row else ""
@@ -818,7 +1066,7 @@ def chapter_quiz(course_id: str, chapter_no: int, authorization: Optional[str] =
 @app.post("/api/courses/{course_id}/chapters/{chapter_no}/complete")
 def chapter_complete(course_id: str, chapter_no: int, body: ChapterCompleteBody,
                      authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     c = COURSES_BY_ID.get(course_id)
     if not c:
         raise HTTPException(404, "Unknown course")
@@ -903,7 +1151,7 @@ class QuizSubmitBody(BaseModel):
 
 @app.post("/api/quiz/personalized/submit")
 def personalized_quiz_submit(body: QuizSubmitBody, authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     _, key = _user_department(user_id)
     bank = {q["id"]: q for q in QUESTION_BANK[key]}
     per_area, results = {}, []
@@ -954,7 +1202,7 @@ async def upload_material(file: UploadFile = File(...), authorization: Optional[
     if len(text.strip()) < 100:
         raise HTTPException(400, "Material too short to generate a quiz from")
     conn = get_db()
-    cur = conn.execute("INSERT INTO materials (user_id, filename, text) VALUES (?,?,?)",
+    cur = conn.execute("INSERT INTO materials (user_id, filename, text) VALUES (?,?,?) RETURNING id",
                        (user_id, file.filename, text))
     conn.commit()
     mid = cur.lastrowid
@@ -997,7 +1245,7 @@ def generate_material_quiz(material_id: int, n: int = 5, level: str = "Understan
     questions, generator, used_chunks = mat_engine.generate_quiz_from_material(
         row["text"], n=n, level=level, focus_query=focus_query, material_id=material_id)
     conn = get_db()
-    cur = conn.execute("INSERT INTO generated_quizzes (material_id, user_id, questions_json, generator) VALUES (?,?,?,?)",
+    cur = conn.execute("INSERT INTO generated_quizzes (material_id, user_id, questions_json, generator) VALUES (?,?,?,?) RETURNING id",
                        (material_id, user_id, json.dumps(questions), generator))
     conn.commit()
     quiz_id = cur.lastrowid
@@ -1023,7 +1271,7 @@ def semantic_course_search(q: str, top_k: int = 5, authorization: Optional[str] 
 @app.post("/api/materials/quizzes/{quiz_id}/grade")
 def grade_generated_quiz(quiz_id: int, body: QuizSubmitBody, authorization: Optional[str] = Header(None)):
     """Grade answers against a generated quiz (answers were stripped client-side)."""
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     conn = get_db()
     row = conn.execute("SELECT questions_json, generator FROM generated_quizzes WHERE id=? AND user_id=?",
                        (quiz_id, user_id)).fetchone()
@@ -1156,7 +1404,7 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
 
     conn = get_db()
     cur = conn.execute(
-        "INSERT INTO personalized_quizzes (user_id, focus_areas_json, course_key, module_no, questions_json, generator) VALUES (?,?,?,?,?,?)",
+        "INSERT INTO personalized_quizzes (user_id, focus_areas_json, course_key, module_no, questions_json, generator) VALUES (?,?,?,?,?,?) RETURNING id",
         (user_id, json.dumps(weak), chosen["course_key"] if chosen else None,
          chosen["module_no"] if chosen else None, json.dumps(questions), generator))
     conn.commit()
@@ -1170,7 +1418,7 @@ def personalized_generate(body: PersonalizedGenerateBody, authorization: Optiona
 
 @app.post("/api/personalized/{quiz_id}/grade")
 def personalized_grade(quiz_id: int, body: QuizSubmitBody, authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     conn = get_db()
     row = conn.execute("SELECT * FROM personalized_quizzes WHERE id=? AND user_id=?",
                        (quiz_id, user_id)).fetchone()
@@ -1285,7 +1533,10 @@ def lesson_quiz(course_key: str, module_no: int, video_no: int,
                       "question": q["text"], "level": "L2"} for q in qs]
 
     conn = get_db()
-    conn.execute("INSERT OR REPLACE INTO lesson_quizzes (user_id, course_key, module_no, video_no, video_id, questions_json, generator) VALUES (?,?,?,?,?,?,?)",
+    conn.execute("INSERT INTO lesson_quizzes (user_id, course_key, module_no, video_no, video_id, questions_json, generator) "
+                 "VALUES (?,?,?,?,?,?,?) ON CONFLICT (user_id, course_key, module_no, video_no) DO UPDATE SET "
+                 "video_id=excluded.video_id, questions_json=excluded.questions_json, "
+                 "generator=excluded.generator, score=NULL",
                  (user_id, course_key, module_no, video_no, video["yt"], json.dumps(questions), generator))
     conn.commit()
     conn.close()
@@ -1297,7 +1548,7 @@ def lesson_quiz(course_key: str, module_no: int, video_no: int,
 @app.post("/api/roadmap/{course_key}/lesson/{module_no}/{video_no}/complete")
 def lesson_quiz_complete(course_key: str, module_no: int, video_no: int, body: ChapterCompleteBody,
                          authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_quiz_user(authorization)
     conn = get_db()
     row = conn.execute(
         "SELECT questions_json FROM lesson_quizzes WHERE user_id=? AND course_key=? AND module_no=? AND video_no=?",
@@ -1400,7 +1651,7 @@ class ChatBody(BaseModel):
 
 @app.post("/api/chat")
 def chat(body: ChatBody, authorization: Optional[str] = Header(None)):
-    user_id = require_user(authorization)
+    user_id = require_writable_user(authorization)
     context = _chat_context(user_id)
 
     conn = get_db()
@@ -1412,7 +1663,8 @@ def chat(body: ChatBody, authorization: Optional[str] = Header(None)):
     reply, intent, course_key, mode = None, "general", None, "fallback"
     if llm.llm_available():
         try:
-            raw = llm.generate(CHAT_SYSTEM_PROMPT.format(context=context, message=body.message), max_tokens=1500)
+            safe_message = privacy.redact_pii(body.message)
+            raw = llm.generate(CHAT_SYSTEM_PROMPT.format(context=context, message=safe_message), max_tokens=1500)
             raw = raw.strip()
             if raw.startswith("```"):
                 raw = raw.split("```")[1]
@@ -1484,7 +1736,7 @@ def admin_analytics(authorization: Optional[str] = Header(None)):
     import roadmap_data
     conn = get_db()
     area_stats = conn.execute(
-        "SELECT area, ROUND(AVG(score),1) AS avg_score, COUNT(*) AS n FROM user_competency GROUP BY area ORDER BY avg_score"
+        "SELECT area, ROUND(AVG(score)::numeric,1) AS avg_score, COUNT(*) AS n FROM user_competency GROUP BY area ORDER BY avg_score"
     ).fetchall()
     dept_stats = conn.execute(
         "SELECT u.department, COUNT(DISTINCT u.id) AS users FROM users u WHERE u.id != 0 GROUP BY u.department"
@@ -1507,18 +1759,18 @@ def admin_analytics(authorization: Optional[str] = Header(None)):
             roadmap_completions[course["name"]] = roadmap_completions.get(course["name"], 0) + 1
     total_users = conn.execute("SELECT COUNT(*) AS n FROM users WHERE id != 0").fetchone()["n"]
     assessed_users = conn.execute("SELECT COUNT(DISTINCT user_id) AS n FROM assessment_results WHERE user_id != 0").fetchone()["n"]
-    avg_assessment = conn.execute("SELECT ROUND(AVG(overall),1) AS a FROM ("
-                                   "SELECT (SELECT SUM(value) FROM json_each(scores_json)) / "
-                                   "(SELECT COUNT(*) FROM json_each(scores_json)) AS overall "
-                                   "FROM assessment_results)").fetchone()
+    avg_assessment = conn.execute("SELECT ROUND(AVG(overall)::numeric,1) AS a FROM ("
+                                   "SELECT (SELECT SUM((value::text)::numeric) FROM json_each(scores_json::json)) / "
+                                   "(SELECT COUNT(*) FROM json_each(scores_json::json)) AS overall "
+                                   "FROM assessment_results) sub").fetchone()
     lesson_scores = conn.execute(
-        "SELECT ROUND(AVG(score),1) AS avg_score, COUNT(*) AS n FROM lesson_quizzes WHERE score IS NOT NULL"
+        "SELECT ROUND(AVG(score)::numeric,1) AS avg_score, COUNT(*) AS n FROM lesson_quizzes WHERE score IS NOT NULL"
     ).fetchone()
     active_learners = conn.execute(
         "SELECT COUNT(DISTINCT user_id) AS n FROM lesson_quizzes WHERE score IS NOT NULL"
     ).fetchone()["n"]
     per_course = conn.execute(
-        "SELECT course_key, COUNT(DISTINCT user_id) AS learners, ROUND(AVG(score),1) AS avg_score "
+        "SELECT course_key, COUNT(DISTINCT user_id) AS learners, ROUND(AVG(score)::numeric,1) AS avg_score "
         "FROM lesson_quizzes WHERE score IS NOT NULL GROUP BY course_key"
     ).fetchall()
     swap_rows = conn.execute(

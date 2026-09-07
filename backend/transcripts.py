@@ -104,7 +104,9 @@ def get_transcript(video_id: str, max_chars: int = 24000) -> str:
     if not text:
         return ""
     conn = get_db()
-    conn.execute("INSERT OR REPLACE INTO transcripts (video_id, text, chars, indexed) VALUES (?,?,?,?)",
+    conn.execute("INSERT INTO transcripts (video_id, text, chars, indexed) VALUES (?,?,?,?) "
+                 "ON CONFLICT (video_id) DO UPDATE SET text=excluded.text, chars=excluded.chars, "
+                 "indexed=excluded.indexed, fetched_at=NOW()::text",
                  (video_id, text, len(text), 0))
     conn.commit()
     conn.close()

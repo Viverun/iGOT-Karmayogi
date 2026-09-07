@@ -7,6 +7,7 @@
 <title>Log in — iGOT Karmayogi</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="i18n.js"></script>
 <style>body { font-family: 'Poppins', sans-serif; }</style>
 </head>
 <body class="bg-[#FCE8D5] min-h-screen text-slate-800">
@@ -20,25 +21,53 @@
         <span class="block text-[10px] text-slate-500 border-t border-slate-300 mt-0.5">लोकलहित में कार्यतात्</span>
       </span>
     </a>
-    <a href="index.html" class="ml-auto text-sm text-slate-500 hover:text-blue-700">← Back to home</a>
+    <div class="ml-auto flex items-center gap-3">
+      <script>document.write(renderLanguageDropdown());</script>
+      <a href="index.html" class="text-sm text-slate-500 hover:text-blue-700">← Back to home</a>
+    </div>
   </nav>
 </header>
+
+<!-- Demo guide (side note) -->
+<div id="demoSideNote" class="hidden lg:block fixed left-[4%] top-1/2 -translate-y-1/2 z-40 max-w-[300px] opacity-0 pointer-events-none transition-all duration-700
+            bg-white border-l-4 border-orange-400 rounded-r-xl shadow-lg p-5">
+  <p class="text-xs font-bold uppercase tracking-wide text-orange-500 mb-2">Demo mode</p>
+  <p id="demoSideNoteText" class="text-sm text-slate-700 leading-relaxed">
+    For demonstration purposes, you are signing in as
+    <span class="font-semibold text-blue-800">a Deputy Advisor (Banking), Department of Financial Services</span> —
+    a read-only account that already has prior course and assessment history on record.
+  </p>
+  <p class="text-sm text-slate-700 mt-2">Go ahead and click <span class="font-semibold">Log in</span> to step into the solution.</p>
+  <button onclick="this.parentElement.remove()" class="mt-3 text-xs text-slate-400 hover:text-slate-600 underline">Dismiss</button>
+</div>
 
 <main class="mx-auto max-w-md mt-12 mb-16">
   <div class="bg-white rounded-2xl shadow-xl p-8">
     <h1 class="text-2xl font-bold text-[#1a3a6b]">Log in to iGOT Karmayogi</h1>
     <p class="text-sm text-slate-500 mt-1">Government officials' capacity building platform.</p>
 
+    <!-- Persona switch: which demo identity to log in as -->
+    <div class="mt-6">
+      <label class="text-sm font-medium">Log in as <span class="text-red-500">*</span></label>
+      <div class="mt-1 grid grid-cols-1 gap-3">
+        <button type="button" id="personaBankingBtn" onclick="setPersona('banking')"
+                class="persona-btn border border-blue-500 bg-blue-50 rounded-lg px-4 py-2.5 text-sm font-medium text-blue-800 text-left">
+          🏦 Deputy Advisor (Banking) — read-only
+          <span class="block text-[11px] font-normal text-slate-500">Department of Financial Services — already onboarded, view-only account</span>
+        </button>
+      </div>
+    </div>
+
     <form id="loginForm" class="mt-6 space-y-4">
       <div>
         <label class="text-sm font-medium">Email</label>
-        <input id="email" type="email" required placeholder="demo@gov.in"
-               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        <input readonly id="email" type="email" required
+               class="ro-field mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm bg-slate-50" />
       </div>
       <div>
         <label class="text-sm font-medium">Password</label>
-        <input id="password" type="password" required
-               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        <input readonly id="password" type="password" required
+               class="ro-field mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm bg-slate-50" />
       </div>
       <p id="error" class="hidden text-sm text-red-600"></p>
       <button type="submit" id="submitBtn"
@@ -47,11 +76,6 @@
       </button>
     </form>
 
-    <div class="mt-5 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
-      <p class="font-semibold text-amber-800">Demo credentials (prototype — no real authentication)</p>
-      <p class="text-amber-700 mt-1">Email: <code class="font-mono">demo@gov.in</code> · Password: <code class="font-mono">demo123</code></p>
-    </div>
-
     <p class="mt-6 text-sm text-slate-600">
       New to iGOT? <a href="register.html" class="text-blue-700 font-semibold">Register here</a>
     </p>
@@ -59,8 +83,37 @@
 </main>
 
 <script>
-const API = window.IGOT_API_BASE || (["localhost", "127.0.0.1"].includes(location.hostname) ? "http://localhost:8001" : "https://igot-karmayogi-zs8h.onrender.com");
-if (localStorage.getItem("igot_token")) location.href = "index.html";
+const API = window.IGOT_API_BASE ||
+  (["localhost", "127.0.0.1"].includes(location.hostname)
+    ? "http://127.0.0.1:8001"
+    : "https://igot-karmayogi-zs8h.onrender.com");
+// No auto-redirect on a stale/present token — always let the login form render
+// so switching demo personas never gets bounced into a confusing redirect loop.
+// Clear any stale session so a leftover invalid token can't 401-loop elsewhere.
+localStorage.removeItem("igot_token");
+localStorage.removeItem("igot_user");
+
+// demo side note: fade in after 2.5s
+setTimeout(() => {
+  const el = document.getElementById("demoSideNote");
+  if (el) { el.classList.remove("opacity-0", "pointer-events-none"); }
+}, 2500);
+
+const PERSONAS = {
+  banking: {
+    email: "deputyadvisor@banking.gov.in", password: "demo123",
+    note: 'For demonstration purposes, you are signing in as <span class="font-semibold text-blue-800">a Deputy Advisor (Banking), Department of Financial Services</span> — a read-only account that already has prior course and assessment history on record.',
+  },
+};
+
+function setPersona(key) {
+  const p = PERSONAS[key];
+  document.getElementById("email").value = p.email;
+  document.getElementById("password").value = p.password;
+  const textEl = document.getElementById("demoSideNoteText");
+  if (textEl) textEl.innerHTML = p.note;
+}
+setPersona("banking");
 
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -80,7 +133,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     if (!res.ok) throw new Error(data.detail || "Login failed");
     localStorage.setItem("igot_token", data.access_token);
     localStorage.setItem("igot_user", JSON.stringify(data.user));
-    location.href = "index.html";
+    location.href = "dashboard.html";
   } catch (err) {
     errEl.textContent = err.message;
     errEl.classList.remove("hidden");

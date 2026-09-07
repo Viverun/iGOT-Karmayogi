@@ -1,11 +1,11 @@
 """Patient resumable indexer for the large freeCodeCamp transcript."""
-import sqlite3, time
+import time
 import vector_store
 from materials import chunk_text
+from db import get_db
 
-DB = "igot.db"
-c = sqlite3.connect(DB); c.row_factory = sqlite3.Row
-text = c.execute("SELECT text FROM transcripts WHERE video_id='rfscVS0vtbw'").fetchone()[0]
+c = get_db()
+text = c.execute("SELECT text FROM transcripts WHERE video_id='rfscVS0vtbw'").fetchone()["text"]
 chunks = [x for x in chunk_text(text) if len(x.strip()) > 80]
 print("total chunks:", len(chunks), flush=True)
 
