@@ -69,6 +69,9 @@ if (requireAuth() && !redirectIfAdmin()) {
     const btn = document.getElementById("nextBtn");
     btn.disabled = chosen[q.id] === undefined;
     btn.textContent = idx === questions.length - 1 ? "Submit" : "Next";
+    if (typeof translateDynamicElement === "function") {
+      translateDynamicElement(document.getElementById("quizArea"), getCurrentLanguage());
+    }
   }
 
   function pick(i) {
@@ -111,6 +114,9 @@ if (requireAuth() && !redirectIfAdmin()) {
       </div>
       <p class="mt-4 text-sm text-slate-500">Role readiness is now <b>${res.readiness_pct}%</b>. Your roadmap has been refreshed.</p>
       <a href="dashboard.html" class="inline-block mt-4 px-8 py-2.5 rounded-full bg-orange-400 text-white font-semibold hover:bg-orange-500">Back to Dashboard</a>`;
+    if (typeof translateDynamicElement === "function") {
+      translateDynamicElement(r, getCurrentLanguage());
+    }
   }
 
   init().catch(e => showPageError(e.message));
