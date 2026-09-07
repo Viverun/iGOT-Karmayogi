@@ -10,6 +10,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.6"
+      - key: DATABASE_URL
+        sync: false          # Supabase Postgres connection string (Transaction pooler URI, IPv4-compatible)
       - key: OPENAI_API_KEY
         sync: false          # set in Render dashboard (Azure OpenAI key)
       - key: OPENAI_BASE_URL

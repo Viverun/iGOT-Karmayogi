@@ -25,9 +25,13 @@ jobs:
         run: pip install -r backend/requirements.txt
       - name: Import check (catches route/model definition errors)
         working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python -c "import main; print('routes:', len(main.app.routes))"
       - name: Smoke test API (boots uvicorn, hits live endpoints)
         working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           python -m uvicorn main:app --port 8001 &
           for i in $(seq 1 30); do
