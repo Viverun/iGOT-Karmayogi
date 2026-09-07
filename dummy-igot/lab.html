@@ -10,6 +10,7 @@
 <script src="common.js"></script>
 <link rel="stylesheet" data-name="vs/editor/editor.main"
       href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/editor/editor.main.min.css" />
+<script src="i18n.js"></script>
 <style>
   body { font-family: 'Poppins', sans-serif; }
   #editor-container { height: 400px; border: 1px solid #e2e8f0; border-radius: 0 0 12px 12px; overflow: hidden; }
@@ -35,6 +36,7 @@
     <h1 id="labTitle" class="text-lg font-bold text-[#1a3a6b] truncate">Hands-On Lab</h1>
     <p id="labSubtitle" class="text-xs text-slate-400 truncate"></p>
   </div>
+  <script>document.write(renderLanguageDropdown());</script>
   <div id="pyodide-status" class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full bg-amber-100 text-amber-700">
     <span class="inline-block animate-spin">⚙</span>&nbsp;Loading Python runtime…
   </div>

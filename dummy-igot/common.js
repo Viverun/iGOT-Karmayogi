@@ -1,4 +1,10 @@
 /* Shared helpers for the iGOT Karmayogi prototype frontend */
+if (typeof document !== "undefined" && !document.querySelector('script[src*="i18n.js"]')) {
+  const i18nScript = document.createElement("script");
+  i18nScript.src = "i18n.js";
+  document.head.appendChild(i18nScript);
+}
+
 window.IGOT_API_BASE = window.IGOT_API_BASE ||
   (["localhost", "127.0.0.1"].includes(location.hostname)
     ? "http://localhost:8001"
@@ -121,10 +127,14 @@ function renderFooter() {
 
 function renderHeader(active) {
   const user = getUser();
+  const langDropdown = typeof renderLanguageDropdown === "function" ? renderLanguageDropdown() : "";
   const govtStrip = `
   <div class="mx-auto max-w-7xl mb-2 flex items-center justify-between text-[11px] font-medium px-6">
     <span class="text-slate-500">भारत सरकार · Government of India</span>
-    <span class="text-slate-500">Department of Personnel &amp; Training · Mission Karmayogi</span>
+    <div class="flex items-center gap-4">
+      <span class="text-slate-500 hidden sm:inline">Department of Personnel &amp; Training · Mission Karmayogi</span>
+      ${langDropdown}
+    </div>
   </div>`;
   return `${govtStrip}
   <header class="sticky top-3 z-50 px-4">

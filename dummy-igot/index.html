@@ -9,6 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script src="i18n.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
@@ -137,6 +138,15 @@
 </style>
 </head>
 <body class="bg-white text-slate-800">
+
+<!-- ===== Govt Strip with Language Switcher ===== -->
+<div class="mx-auto max-w-7xl pt-2 mb-1 flex items-center justify-between text-[11px] font-medium px-6">
+  <span class="text-slate-500">भारत सरकार · Government of India</span>
+  <div class="flex items-center gap-4">
+    <span class="text-slate-500 hidden sm:inline">Department of Personnel &amp; Training · Mission Karmayogi</span>
+    <script>document.write(renderLanguageDropdown());</script>
+  </div>
+</div>
 
 <!-- ===== Floating Navbar ===== -->
 <header class="site-header">

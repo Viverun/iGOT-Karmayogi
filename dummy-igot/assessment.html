@@ -7,6 +7,7 @@
 <title>Competency Assessment — iGOT Karmayogi</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="i18n.js"></script>
 <style>
   body { font-family: 'Poppins', sans-serif; }
   .opt:hover { border-color: #1d4ed8; background: #eff6ff; }
@@ -24,7 +25,10 @@
         <span class="block text-[10px] text-slate-500 border-t border-slate-300 mt-0.5">लोकलहित में कार्यतात्</span>
       </span>
     </a>
-    <a href="index.html" class="ml-auto text-sm text-slate-500 hover:text-blue-700">← Back to home</a>
+    <div class="ml-auto flex items-center gap-3">
+      <script>document.write(renderLanguageDropdown());</script>
+      <a href="index.html" class="text-sm text-slate-500 hover:text-blue-700">← Back to home</a>
+    </div>
   </nav>
 </header>
 
