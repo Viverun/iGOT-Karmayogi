@@ -58,7 +58,7 @@
   .partner-logo:hover { filter: grayscale(0); opacity: 1; transform: translateY(-3px); }
   .partner-scroller { display: flex; gap: 2rem; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; padding: .25rem .1rem .75rem; }
   .partner-scroller .partner-logo { flex: 0 0 170px; scroll-snap-align: center; }
-  .showcased-section { margin: 0 auto 2rem; max-width: 1620px; padding: 3.5rem clamp(1rem, 4vw, 3.5rem) 4rem; border-radius: 2rem; background: #fff; box-shadow: 0 12px 36px rgba(23, 43, 77, .08); }
+  .showcased-section { margin: 0 auto 2rem; max-width: 1620px; padding: 3.5rem clamp(1rem, 4vw, 3.5rem) 4rem; border-radius: 2rem; background: url('assets/Images/background.png') center / cover no-repeat; box-shadow: 0 12px 36px rgba(23, 43, 77, .08); }
   .showcased-heading { display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 2rem; }
   .showcased-heading h2 { color: #102f65; font-size: clamp(1.65rem, 2.4vw, 2.25rem); font-weight: 700; }
   .showcased-heading a { position: absolute; right: 0; display: inline-flex; align-items: center; gap: .5rem; color: #1b4ca1; font-size: .95rem; font-weight: 600; }
@@ -361,7 +361,10 @@
 <button class="fixed right-4 top-1/2 z-50 w-12 h-12 rounded-full bg-white border-2 border-blue-700 text-blue-700 shadow-lg" title="Accessibility options">♿</button>
 
 <script>
-const API_BASE = window.IGOT_API_BASE || "https://igot-karmayogi-zs8h.onrender.com";
+const API_BASE = window.IGOT_API_BASE ||
+  (["localhost", "127.0.0.1"].includes(location.hostname)
+    ? "http://127.0.0.1:8001"
+    : "https://igot-karmayogi-zs8h.onrender.com");
 const heroSlides = [
   { src: "assets/Images/Hero_Section_Slider/pm_ad.png", alt: "Karmayogi Bharat programme" },
   { src: "assets/Images/Hero_Section_Slider/certificate_img.png", alt: "iGOT Karmayogi certificate programme" },

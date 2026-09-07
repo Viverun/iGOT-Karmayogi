@@ -198,6 +198,11 @@ def require_writable_user(auth_header: Optional[str]) -> int:
     return user_id
 
 
+def require_quiz_user(auth_header: Optional[str]) -> int:
+    """Allow authenticated learners to submit quizzes, including demo read-only accounts."""
+    return require_user(auth_header)
+
+
 # ---------- Auth (dummy) ----------
 
 class AuthBody(BaseModel):
@@ -620,7 +625,7 @@ def roadmap_module_quiz(course_key: str, module_no: int, authorization: Optional
 def roadmap_module_complete(course_key: str, module_no: int, body: ChapterCompleteBody,
                             authorization: Optional[str] = Header(None)):
     """Grade the module quiz against the stored transcript-grounded questions; feed memory."""
-    user_id = require_writable_user(authorization)
+    user_id = require_quiz_user(authorization)
     import roadmap_data
     c = roadmap_data.get_course(course_key)
     if not c:
@@ -1605,7 +1610,7 @@ def lesson_quiz(course_key: str, module_no: int, video_no: int,
 @app.post("/api/roadmap/{course_key}/lesson/{module_no}/{video_no}/complete")
 def lesson_quiz_complete(course_key: str, module_no: int, video_no: int, body: ChapterCompleteBody,
                          authorization: Optional[str] = Header(None)):
-    user_id = require_writable_user(authorization)
+    user_id = require_quiz_user(authorization)
     conn = get_db()
     row = conn.execute(
         "SELECT questions_json FROM lesson_quizzes WHERE user_id=? AND course_key=? AND module_no=? AND video_no=?",

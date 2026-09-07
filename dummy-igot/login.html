@@ -83,7 +83,10 @@
 </main>
 
 <script>
-const API = window.IGOT_API_BASE || "https://igot-karmayogi-zs8h.onrender.com";
+const API = window.IGOT_API_BASE ||
+  (["localhost", "127.0.0.1"].includes(location.hostname)
+    ? "http://127.0.0.1:8001"
+    : "https://igot-karmayogi-zs8h.onrender.com");
 // No auto-redirect on a stale/present token — always let the login form render
 // so switching demo personas never gets bounced into a confusing redirect loop.
 // Clear any stale session so a leftover invalid token can't 401-loop elsewhere.

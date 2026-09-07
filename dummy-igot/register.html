@@ -118,7 +118,10 @@ setTimeout(() => {
   if (el) { el.classList.remove("opacity-0", "pointer-events-none"); }
 }, 2500);
 
-const API = window.IGOT_API_BASE || "https://igot-karmayogi-zs8h.onrender.com";
+const API = window.IGOT_API_BASE ||
+  (["localhost", "127.0.0.1"].includes(location.hostname)
+    ? "http://127.0.0.1:8001"
+    : "https://igot-karmayogi-zs8h.onrender.com");
 // No auto-redirect on a stale/present token — always let the register form render.
 
 const PERSONAS = {
