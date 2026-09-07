@@ -77,6 +77,7 @@ ROADMAP_COURSES = [
         "level": "L1 → L3",
         "hours": 20,
         "tier": "core",
+        "lab_after_module": 1,
         "areas": ["Python", "Data Interpretation", "AI and Emerging Tech"],
         "description": "From Python foundations to rasterio/GDAL, GeoPandas and ML-on-satellite-images — the emerging-tech skill ISRO's data divisions demand.",
         "modules": [
@@ -242,6 +243,7 @@ ROADMAP_COURSES = [
         "level": "L1 → L2",
         "hours": 16,
         "tier": "core",
+        "lab_after_module": 1,
         "areas": ["Python", "SQL", "Data Visualization", "Data Interpretation"],
         "description": "Python and SQL for the officer who needs to clean, tabulate and visualize survey microdata — no prior programming assumed.",
         "modules": [
@@ -341,6 +343,7 @@ ROADMAP_COURSES = [
         "level": "L1 → L2",
         "hours": 8,
         "tier": "core",
+        "lab_after_module": 1,
         "areas": ["Digital Banking", "Cybersecurity and Data Protection"],
         "description": "UPI, IMPS, NEFT/RTGS and the regulatory framework securing India's digital payments ecosystem.",
         "modules": [
@@ -366,6 +369,7 @@ ROADMAP_COURSES = [
         "level": "L1 → L2",
         "hours": 14,
         "tier": "core",
+        "lab_after_module": 1,
         "areas": ["Data Analysis", "Digital Banking"],
         "description": "Python and SQL fundamentals applied to loan portfolios, transaction monitoring and regulatory reporting.",
         "modules": [
@@ -448,3 +452,228 @@ def get_course(key: str):
         if c["key"] == key:
             return c
     return None
+
+
+# ---------- Hands-On Coding Lab problems ----------
+# Graded entirely client-side (Pyodide): the student's code is run, then each
+# test case's function call is executed against it. Problem `id`s are matched
+# against a fixed dispatch table in dummy-igot/lab.html's buildCall() — do not
+# rename an id here without updating that table too.
+
+CODING_LAB_PROBLEMS = {
+    "python-geospatial": {
+        "title": "Hands-On Lab: Geospatial Python",
+        "subtitle": "NDVI, vegetation filtering and pixel classification — the everyday building blocks of satellite image analysis.",
+        "problems": [
+            {
+                "id": "pg_p1", "title": "NDVI Calculator", "difficulty": "Easy",
+                "description": "Write `ndvi(red, nir)` that computes the Normalized Difference Vegetation "
+                                "Index: `(nir - red) / (nir + red)`.\n- `red` and `nir` are reflectance values (floats).\n"
+                                "- Return a float.",
+                "hints": ["NDVI = (NIR - Red) / (NIR + Red)", "Watch out for division — both inputs are floats here so normal `/` is fine."],
+                "starter_code": "def ndvi(red, nir):\n    # TODO: return the NDVI value\n    pass\n",
+                "test_cases": [
+                    {"label": "red=0.2, nir=0.5", "input": {"red": 0.2, "nir": 0.5}, "expected": 0.42857142857142855},
+                    {"label": "red=0.1, nir=0.1 (bare soil)", "input": {"red": 0.1, "nir": 0.1}, "expected": 0.0},
+                    {"label": "red=0.3, nir=0.1 (water)", "input": {"red": 0.3, "nir": 0.1}, "expected": -0.5},
+                ],
+            },
+            {
+                "id": "pg_p2", "title": "Filter Vegetation Pixels", "difficulty": "Easy",
+                "description": "Write `filter_vegetation(pixel_list, threshold)`. `pixel_list` is a list of "
+                                "`{\"id\": int, \"ndvi\": float}` dicts. Return a list of the `id`s whose `ndvi` "
+                                "is **greater than or equal to** `threshold`, keeping their original order.",
+                "hints": ["A simple list comprehension does this in one line.", "`>=`, not `>`."],
+                "starter_code": "def filter_vegetation(pixel_list, threshold):\n    # TODO: return a list of ids with ndvi >= threshold\n    pass\n",
+                "test_cases": [
+                    {"label": "mixed pixels, threshold 0.3",
+                     "input": {"pixel_list": [{"id": 1, "ndvi": 0.1}, {"id": 2, "ndvi": 0.5}, {"id": 3, "ndvi": 0.35}], "threshold": 0.3},
+                     "expected": [2, 3]},
+                    {"label": "no pixel meets threshold",
+                     "input": {"pixel_list": [{"id": 1, "ndvi": 0.05}, {"id": 2, "ndvi": 0.02}], "threshold": 0.3},
+                     "expected": []},
+                ],
+            },
+            {
+                "id": "pg_p3", "title": "Classify Image Pixels", "difficulty": "Medium",
+                "description": "Write `classify_image(pixels)`. `pixels` is a list of `{\"id\": int, \"ndvi\": float}` "
+                                "dicts. Return a list of `{\"id\": int, \"status\": str}` dicts where `status` is:\n"
+                                "- `\"water\"` if `ndvi < 0`\n- `\"soil\"` if `0 <= ndvi < 0.3`\n"
+                                "- `\"vegetation\"` if `ndvi >= 0.3`",
+                "hints": ["Keep the output order the same as the input order.", "This is exactly the same threshold as the previous problem, just with three bands instead of one."],
+                "starter_code": "def classify_image(pixels):\n    # TODO: return [{\"id\":.., \"status\":..}, ...]\n    pass\n",
+                "test_cases": [
+                    {"label": "one of each class",
+                     "input": {"pixels": [{"id": 1, "ndvi": -0.2}, {"id": 2, "ndvi": 0.1}, {"id": 3, "ndvi": 0.6}]},
+                     "expected_statuses": ["water", "soil", "vegetation"]},
+                    {"label": "boundary values (0.29 vs 0.3)",
+                     "input": {"pixels": [{"id": 1, "ndvi": 0.29}, {"id": 2, "ndvi": 0.3}]},
+                     "expected_statuses": ["soil", "vegetation"]},
+                ],
+            },
+        ],
+    },
+    "data-tools-for-officials": {
+        "title": "Hands-On Lab: Data Tools for Officials",
+        "subtitle": "Summary statistics, outlier detection and grouped averages — the everyday building blocks of tabulating survey data.",
+        "problems": [
+            {
+                "id": "dto_p1", "title": "Summary Statistics", "difficulty": "Easy",
+                "description": "Write `summary_stats(data)`. `data` is a list of numbers. Return "
+                                "`{\"mean\": float, \"min\": float, \"max\": float}`.",
+                "hints": ["Python's built-in `sum`, `min`, `max` are all you need."],
+                "starter_code": "def summary_stats(data):\n    # TODO: return {\"mean\":.., \"min\":.., \"max\":..}\n    pass\n",
+                "test_cases": [
+                    {"label": "[10, 20, 30, 40]", "input": {"data": [10, 20, 30, 40]}, "expected": {"mean": 25, "min": 10, "max": 40}},
+                    {"label": "single value [5]", "input": {"data": [5]}, "expected": {"mean": 5, "min": 5, "max": 5}},
+                ],
+            },
+            {
+                "id": "dto_p2", "title": "Remove Outliers", "difficulty": "Medium",
+                "description": "Write `remove_outliers(data)`. `data` is a list of numbers. An outlier is any "
+                                "value **greater than double the median** of the list. Return the remaining "
+                                "values, keeping their original order.",
+                "hints": ["`sorted(data)[len(data)//2]` gives the median for odd-length lists (all test cases here have odd length).", "Compute the median first, then filter."],
+                "starter_code": "def remove_outliers(data):\n    # TODO: drop values > 2x the median, keep order\n    pass\n",
+                "test_cases": [
+                    {"label": "[10, 12, 11, 13, 100] — 100 is the outlier",
+                     "input": {"data": [10, 12, 11, 13, 100]}, "expected_length": 4, "expected_no_value": 100},
+                    {"label": "[5, 5, 5, 5] — nothing to remove",
+                     "input": {"data": [5, 5, 5, 5]}, "expected_length": 4},
+                ],
+            },
+            {
+                "id": "dto_p3", "title": "Grouped Average", "difficulty": "Medium",
+                "description": "Write `group_average(records, group_key, value_key)`. `records` is a list of "
+                                "dicts. Group them by `record[group_key]` and return `{group_value: average}` "
+                                "where `average` is the mean of `record[value_key]` within that group.",
+                "hints": ["A dict of running (sum, count) per group, then divide at the end, works well."],
+                "starter_code": "def group_average(records, group_key, value_key):\n    # TODO: return {group: average}\n    pass\n",
+                "test_cases": [
+                    {"label": "group by dept",
+                     "input": {"records": [{"dept": "A", "score": 10}, {"dept": "A", "score": 20}, {"dept": "B", "score": 5}],
+                               "group_key": "dept", "value_key": "score"},
+                     "expected": {"A": 15.0, "B": 5.0}},
+                    {"label": "group by region",
+                     "input": {"records": [{"region": "north", "pct": 50}, {"region": "south", "pct": 70}, {"region": "north", "pct": 30}],
+                               "group_key": "region", "value_key": "pct"},
+                     "expected": {"north": 40.0, "south": 70.0}},
+                ],
+            },
+        ],
+    },
+    "data-analysis-for-banking": {
+        "title": "Hands-On Lab: Data Analysis for Banking",
+        "subtitle": "NPA classification and branch-level risk metrics — the everyday building blocks of loan portfolio analysis.",
+        "problems": [
+            {
+                "id": "dab_p1", "title": "Classify NPAs", "difficulty": "Easy",
+                "description": "Write `classify_npa(loans)`. `loans` is a list of `{\"id\": int, \"days_overdue\": int}` "
+                                "dicts. Return a list of `{\"id\": int, \"status\": str}` dicts where `status` is:\n"
+                                "- `\"standard\"` if `days_overdue <= 90`\n"
+                                "- `\"sub-standard\"` if `91 <= days_overdue <= 365`\n"
+                                "- `\"doubtful\"` if `days_overdue > 365`",
+                "hints": ["This mirrors the real RBI NPA classification rule covered in the Risk Management course."],
+                "starter_code": "def classify_npa(loans):\n    # TODO: return [{\"id\":.., \"status\":..}, ...]\n    pass\n",
+                "test_cases": [
+                    {"label": "one of each class",
+                     "input": {"loans": [{"id": 1, "days_overdue": 30}, {"id": 2, "days_overdue": 120}, {"id": 3, "days_overdue": 400}]},
+                     "expected_statuses": ["standard", "sub-standard", "doubtful"]},
+                    {"label": "boundary values (90/91/365/366)",
+                     "input": {"loans": [{"id": 1, "days_overdue": 90}, {"id": 2, "days_overdue": 91},
+                                          {"id": 3, "days_overdue": 365}, {"id": 4, "days_overdue": 366}]},
+                     "expected_statuses": ["standard", "sub-standard", "sub-standard", "doubtful"]},
+                ],
+            },
+            {
+                "id": "dab_p2", "title": "NPA Ratio by Branch", "difficulty": "Medium",
+                "description": "Write `npa_ratio_by_branch(loans)`. `loans` is a list of "
+                                "`{\"branch\": str, \"amount\": float, \"is_npa\": bool}` dicts. Return "
+                                "`{branch: npa_ratio}` where `npa_ratio` is the percentage of that branch's "
+                                "total loan amount that is flagged `is_npa` (0-100).",
+                "hints": ["ratio = 100 * (sum of NPA amounts) / (sum of all amounts), per branch."],
+                "starter_code": "def npa_ratio_by_branch(loans):\n    # TODO: return {branch: npa_percentage}\n    pass\n",
+                "test_cases": [
+                    {"label": "two branches, one with an NPA",
+                     "input": {"loans": [{"branch": "X", "amount": 100, "is_npa": False}, {"branch": "X", "amount": 100, "is_npa": True},
+                                          {"branch": "Y", "amount": 50, "is_npa": False}]},
+                     "expected": {"X": 50.0, "Y": 0.0}},
+                    {"label": "fully stressed branch",
+                     "input": {"loans": [{"branch": "Z", "amount": 40, "is_npa": True}, {"branch": "Z", "amount": 60, "is_npa": True}]},
+                     "expected": {"Z": 100.0}},
+                ],
+            },
+            {
+                "id": "dab_p3", "title": "Flag Suspicious Transactions", "difficulty": "Medium",
+                "description": "Write `flag_suspicious(transactions, threshold)`. `transactions` is a list of "
+                                "`{\"id\": int, \"amount\": float}` dicts. Return a list of "
+                                "`{\"id\": int, \"suspicious\": bool}` dicts where `suspicious` is `True` when "
+                                "`amount` is **strictly greater than** `threshold`.",
+                "hints": ["Strictly greater than — a transaction exactly at the threshold is not suspicious."],
+                "starter_code": "def flag_suspicious(transactions, threshold=50000):\n    # TODO: return [{\"id\":.., \"suspicious\":..}, ...]\n    pass\n",
+                "test_cases": [
+                    {"label": "one above, one at, one below threshold",
+                     "input": {"transactions": [{"id": 1, "amount": 10000}, {"id": 2, "amount": 60000}, {"id": 3, "amount": 50000}], "threshold": 50000},
+                     "expected_suspicious": [False, True, False]},
+                    {"label": "single large transaction",
+                     "input": {"transactions": [{"id": 1, "amount": 99999}], "threshold": 50000},
+                     "expected_suspicious": [True]},
+                ],
+            },
+        ],
+    },
+    "digital-banking-upi": {
+        "title": "Hands-On Lab: Digital Banking & UPI",
+        "subtitle": "UPI ID validation and payment-success analytics — the everyday building blocks of digital payments monitoring.",
+        "problems": [
+            {
+                "id": "upi_p1", "title": "Validate a UPI ID", "difficulty": "Easy",
+                "description": "Write `validate_upi_id(upi_id)`. A valid UPI ID has the form `handle@bank`: "
+                                "a **non-empty** local part before `@`, exactly one `@`, and a **non-empty** "
+                                "bank handle after it. Return a bool.",
+                "hints": ["`upi_id.count('@') == 1` handles the \"exactly one @\" rule.", "`upi_id.split('@')` then check both parts are non-empty."],
+                "starter_code": "def validate_upi_id(upi_id):\n    # TODO: return True/False\n    pass\n",
+                "test_cases": [
+                    {"label": "valid id", "input": {"upi_id": "ramesh.kumar@okhdfcbank"}, "expected": True},
+                    {"label": "missing @", "input": {"upi_id": "invalid-upi-id"}, "expected": False},
+                    {"label": "empty local part", "input": {"upi_id": "@sbi"}, "expected": False},
+                ],
+            },
+            {
+                "id": "upi_p2", "title": "Success Rate by Bank", "difficulty": "Medium",
+                "description": "Write `success_rate_by_bank(transactions)`. `transactions` is a list of "
+                                "`{\"bank\": str, \"status\": \"success\"|\"failed\"}` dicts. Return "
+                                "`{bank: success_percentage}` (0-100) for each bank.",
+                "hints": ["percentage = 100 * successes / total, per bank."],
+                "starter_code": "def success_rate_by_bank(transactions):\n    # TODO: return {bank: success_percentage}\n    pass\n",
+                "test_cases": [
+                    {"label": "SBI half fail, HDFC all succeed",
+                     "input": {"transactions": [{"bank": "SBI", "status": "success"}, {"bank": "SBI", "status": "failed"},
+                                                 {"bank": "HDFC", "status": "success"}]},
+                     "expected": {"SBI": 50.0, "HDFC": 100.0}},
+                ],
+            },
+            {
+                "id": "upi_p3", "title": "Find Duplicate Payments", "difficulty": "Hard",
+                "description": "Write `find_duplicates(payments)`. `payments` is a list of "
+                                "`{\"id\": int, \"to\": str, \"amount\": float, \"timestamp\": str}` dicts. A "
+                                "payment is a duplicate if an **earlier** payment in the list has the exact "
+                                "same `to`, `amount` and `timestamp`. Return the `id`s of the duplicate "
+                                "payments (not the originals), in the order they appear.",
+                "hints": ["Walk the list once, keeping a `set` of `(to, amount, timestamp)` tuples you've already seen.", "Only flag it as a duplicate if you've seen that combination before — the first occurrence is never a duplicate."],
+                "starter_code": "def find_duplicates(payments):\n    # TODO: return a list of duplicate payment ids\n    pass\n",
+                "test_cases": [
+                    {"label": "one exact repeat",
+                     "input": {"payments": [{"id": 1, "to": "a@bank", "amount": 100, "timestamp": "10:00"},
+                                             {"id": 2, "to": "a@bank", "amount": 100, "timestamp": "10:00"},
+                                             {"id": 3, "to": "b@bank", "amount": 200, "timestamp": "10:05"}]},
+                     "expected": [2]},
+                    {"label": "no duplicates (different amounts)",
+                     "input": {"payments": [{"id": 1, "to": "a@bank", "amount": 50, "timestamp": "09:00"},
+                                             {"id": 2, "to": "a@bank", "amount": 60, "timestamp": "09:00"}]},
+                     "expected": []},
+                ],
+            },
+        ],
+    },
+}
