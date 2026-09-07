@@ -88,7 +88,7 @@ function redirectIfAdmin() {
 const NAV_LINKS = [
   { href: "dashboard.html", label: "Dashboard" },
   { href: "studio.html", label: "Trainer Studio" },
-  { href: "admin.html", label: "Analytics" },
+  { href: "analytics.html", label: "Analytics" },
   { href: "profile.html", label: "Profile" },
 ];
 const ADMIN_NAV_LINKS = [

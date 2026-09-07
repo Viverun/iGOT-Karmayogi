@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+<title>My Analytics — iGOT Karmayogi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="common.js"></script>
+<style>body { font-family: 'Poppins', sans-serif; }</style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+<div id="header"></div>
+
+<main class="mx-auto max-w-6xl px-6 py-8 mb-16">
+  <h1 class="text-2xl font-bold text-[#1a3a6b]">📈 My Skill Analytics</h1>
+  <p class="text-sm text-slate-500 mt-1">
+    Your personal competency breakdown — strengths, gaps and readiness. This is your own data only;
+    for department-wide numbers see <a href="admin.html" class="text-blue-700 hover:underline">NSSTA/MoSPI Organization Analytics</a> (administrators).
+  </p>
+
+  <!-- KPI row -->
+  <section id="kpiRow" class="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-4"></section>
+
+  <!-- Strengths / Weaknesses -->
+  <section class="mt-6 grid lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <h2 class="font-bold text-emerald-700 flex items-center gap-2">💪 Strengths</h2>
+      <p class="text-xs text-slate-400 mt-0.5">areas where you already meet or exceed your role's target</p>
+      <div id="strengthList" class="mt-4 space-y-3 text-sm"></div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <h2 class="font-bold text-amber-700 flex items-center gap-2">📌 Weaknesses / Skill Gaps</h2>
+      <p class="text-xs text-slate-400 mt-0.5">largest gap between your current score and your role's target</p>
+      <div id="weaknessList" class="mt-4 space-y-3 text-sm"></div>
+    </div>
+  </section>
+
+  <!-- Full competency breakdown -->
+  <section class="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+    <div class="flex items-baseline justify-between flex-wrap gap-1">
+      <h2 class="text-lg font-bold text-[#1a3a6b]">Full Competency Breakdown</h2>
+      <p class="text-xs text-slate-400">every measured area · current vs your role's target</p>
+    </div>
+    <div id="fullList" class="mt-4 space-y-3 text-sm"></div>
+  </section>
+
+  <p id="notice" class="hidden mt-6 text-sm text-slate-400 text-center"></p>
+</main>
+
+<script>
+if (requireAuth() && !redirectIfAdmin()) {
+  document.getElementById("header").innerHTML = renderHeader("analytics.html");
+
+  function barRow(v) {
+    const color = v.gap > 0 ? (v.gap >= 20 ? "bg-red-400" : "bg-amber-400") : "bg-emerald-500";
+    return `
+      <div>
+        <div class="flex justify-between text-xs mb-1">
+          <span class="font-medium text-slate-700">${v.area} <span class="text-slate-400">(${v.type})</span></span>
+          <span class="text-slate-500">${v.current}/100 · target ${v.target}${v.gap > 0 ? ` · gap ${v.gap}` : ""}</span>
+        </div>
+        <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div class="h-2 ${color} rounded-full" style="width:${Math.min(100, v.current)}%"></div>
+        </div>
+      </div>`;
+  }
+
+  async function load() {
+    const d = await api("/api/dashboard");
+
+    if (!d.assessment_done) {
+      document.getElementById("kpiRow").innerHTML = "";
+      document.getElementById("notice").textContent =
+        "Take your competency assessment first — this page fills in once you have measured scores.";
+      document.getElementById("notice").classList.remove("hidden");
+      return;
+    }
+
+    const vector = d.competency_vector || [];
+    const scored = vector.filter(v => v.target > 0);
+    const strengths = scored.filter(v => v.gap <= 0).sort((a, b) => b.current - a.current).slice(0, 5);
+    const weaknesses = (d.top_gaps || []).slice(0, 5);
+
+    const topStrength = strengths[0];
+    const topWeakness = weaknesses[0];
+    const kpis = [
+      { label: "role readiness", value: Math.min(100, d.readiness_pct) + "%", sub: `cap ${d.readiness_cap}% · ${d.verified_completions} verified course${d.verified_completions === 1 ? "" : "s"}` },
+      { label: "strongest area", value: topStrength ? topStrength.area : "—", sub: topStrength ? `${topStrength.current}/100` : "take the assessment" },
+      { label: "biggest gap", value: topWeakness ? topWeakness.area : "—", sub: topWeakness ? `${topWeakness.gap} points behind target` : "no gaps recorded" },
+      { label: "areas on target", value: strengths.length + " / " + scored.length, sub: "current ≥ role target" },
+    ];
+    document.getElementById("kpiRow").innerHTML = kpis.map(k => `
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+        <p class="text-[11px] text-slate-400 uppercase tracking-wide">${k.label}</p>
+        <p class="text-xl font-extrabold text-blue-800 mt-1 truncate" title="${k.value}">${k.value}</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">${k.sub}</p>
+      </div>`).join("");
+
+    document.getElementById("strengthList").innerHTML = strengths.length
+      ? strengths.map(barRow).join("")
+      : '<p class="text-slate-400">No area has reached its target yet — complete a course or two to build one.</p>';
+
+    document.getElementById("weaknessList").innerHTML = weaknesses.length
+      ? weaknesses.map((g, i) => `
+          <div>
+            ${barRow(g)}
+            ${d.explanations && d.explanations[i] ? `<p class="text-xs text-slate-400 mt-1">${d.explanations[i]}</p>` : ""}
+          </div>`).join("")
+      : '<p class="text-emerald-700 font-medium">🎉 No open skill gaps — you meet target in every measured area.</p>';
+
+    document.getElementById("fullList").innerHTML = vector.length
+      ? [...vector].sort((a, b) => b.gap - a.gap).map(barRow).join("")
+      : '<p class="text-slate-400">No competency data yet.</p>';
+  }
+
+  load().catch(e => showPageError(e.message));
+}
+</script>
+</body>
+</html>
