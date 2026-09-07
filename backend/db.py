@@ -133,6 +133,17 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     action_json TEXT,     -- structured action the assistant took, if any (e.g. a roadmap swap)
     created_at TEXT DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS coding_labs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    course_key TEXT NOT NULL,
+    lab_no INTEGER NOT NULL DEFAULT 1,
+    code_submitted TEXT,             -- last code the student submitted
+    score REAL,                      -- 0-100: percentage of test cases passed
+    passed INTEGER NOT NULL DEFAULT 0,  -- 1 if score >= 60
+    submitted_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, course_key, lab_no)
+);
 """
 
 # Single demo user for the presentation (no real authentication by design).
@@ -186,6 +197,18 @@ def init_db():
     ucols = [r[1] for r in conn.execute("PRAGMA table_info(users)")]
     if "role" not in ucols:
         conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'official'")
+    # coding_labs table migration (added for hands-on lab feature)
+    conn.execute("""CREATE TABLE IF NOT EXISTS coding_labs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        course_key TEXT NOT NULL,
+        lab_no INTEGER NOT NULL DEFAULT 1,
+        code_submitted TEXT,
+        score REAL,
+        passed INTEGER NOT NULL DEFAULT 0,
+        submitted_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(user_id, course_key, lab_no)
+    )""")
     conn.execute(
         "INSERT OR IGNORE INTO users (name, email, password, designation, department) VALUES (?,?,?,?,?)",
         (DEMO_USER["name"], DEMO_USER["email"], DEMO_USER["password"],

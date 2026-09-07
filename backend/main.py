@@ -30,7 +30,7 @@ import privacy
 from llm import KNOWLEDGE_QUIZ_PROMPT
 
 init_db()
-COURSES = json.loads((Path(__file__).parent / "data" / "courses.json").read_text())
+COURSES = json.loads((Path(__file__).parent / "data" / "courses.json").read_text(encoding="utf-8"))
 COURSES_BY_ID = {c["identifier"]: c for c in COURSES}
 
 app = FastAPI(title="Dummy iGOT Karmayogi API", version="0.1.0")
@@ -201,7 +201,7 @@ def reset_demo(body: ResetDemoBody):
         uid = row["id"]
         for table in ("tokens", "learning_events", "chapter_progress", "lesson_quizzes",
                       "personalized_quizzes", "assessment_results", "user_competency",
-                      "enrollments", "roadmaps"):
+                      "enrollments", "roadmaps", "coding_labs"):
             conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (uid,))
         conn.commit()
     conn.close()
@@ -392,7 +392,8 @@ def get_roadmap_course(course_key: str, authorization: Optional[str] = Header(No
 MODULE_QUIZ_PROMPT = """You are a subject-matter examiner for India's capacity-building programmes.
 A learner just finished the module "{module_title}" (course: {course_name}) watching these video lectures.
 Using ONLY the lecture transcripts below, write {n} multiple-choice questions that precisely test
-comprehension of what the lectures actually taught. Tag each question with its difficulty level:
+comprehension of what the lectures actually taught. All questions, options, and explanations MUST be in clear English.
+Tag each question with its difficulty level:
 "L1" (easy/recall), "L2" (medium/applied) or "L3" (hard/analytical) — include a mix, roughly 2 L1, 2 L2, 1 L3.
 For each question, set "area" to the CLOSEST match from this list: {areas}.
 Return STRICT JSON: a list of objects with fields:
@@ -568,9 +569,160 @@ def roadmap_module_complete(course_key: str, module_no: int, body: ChapterComple
             "readiness_pct": gaps["readiness_pct"]}
 
 
+# ---------- Hands-On Coding Lab endpoints ----------
+
+LAB_TRIGGER_MODULE = 1   # lab unlocks right after Module 1 so learners can test Hands-On Lab immediately
+
+
+class LabCompleteBody(BaseModel):
+    score: float          # 0-100: percentage of test cases the student passed
+    problems_passed: int  # how many individual problems were solved
+    problems_total: int   # total problems in the lab (always 3)
+    code_submitted: Optional[str] = None  # last student code (for review)
+
+
+@app.get("/api/roadmap/{course_key}/lab/{lab_no}")
+def get_lab(course_key: str, lab_no: int, authorization: Optional[str] = Header(None)):
+    """Return the lab problems & starter code.
+    Unlocks as soon as the student has completed and passed Module 1."""
+    user_id = require_user(authorization)
+    import roadmap_data
+    c = roadmap_data.get_course(course_key)
+    if not c:
+        raise HTTPException(404, "Course not found in your roadmap")
+    if "lab_after_module" not in c:
+        raise HTTPException(404, "This course does not have a hands-on lab")
+
+    # Check prerequisite: student must have passed at least Module 1
+    conn = get_db()
+    passed_modules = conn.execute(
+        "SELECT COUNT(*) AS n FROM chapter_progress "
+        "WHERE user_id=? AND course_id=? AND quiz_score >= 60",
+        (user_id, f"roadmap:{course_key}")
+    ).fetchone()["n"]
+    lab_row = conn.execute(
+        "SELECT score, passed FROM coding_labs WHERE user_id=? AND course_key=? AND lab_no=?",
+        (user_id, course_key, lab_no)
+    ).fetchone()
+    conn.close()
+
+    if passed_modules < LAB_TRIGGER_MODULE:
+        raise HTTPException(403, f"Complete and pass Module 1 first to unlock the Hands-On Lab")
+
+    lab_data = roadmap_data.CODING_LAB_PROBLEMS.get(course_key)
+    if not lab_data:
+        raise HTTPException(404, "Lab problems not found for this course")
+
+    # Strip test_runner from the response (it's backend-only for validation)
+    problems_out = []
+    for p in lab_data["problems"]:
+        problems_out.append({k: v for k, v in p.items() if k != "test_runner"})
+
+    return {
+        "course_key": course_key,
+        "lab_no": lab_no,
+        "title": lab_data["title"],
+        "subtitle": lab_data["subtitle"],
+        "course_name": c["name"],
+        "problems": problems_out,
+        "already_passed": bool(lab_row and lab_row["passed"]),
+        "previous_score": lab_row["score"] if lab_row else None,
+    }
+
+
+@app.get("/api/roadmap/{course_key}/lab/{lab_no}/status")
+def lab_status(course_key: str, lab_no: int, authorization: Optional[str] = Header(None)):
+    """Return lab lock/unlock/pass state for the course player sidebar."""
+    user_id = require_user(authorization)
+    import roadmap_data
+    c = roadmap_data.get_course(course_key)
+    if not c or "lab_after_module" not in c:
+        return {"has_lab": False}
+
+    conn = get_db()
+    passed_modules = conn.execute(
+        "SELECT COUNT(*) AS n FROM chapter_progress "
+        "WHERE user_id=? AND course_id=? AND quiz_score >= 60",
+        (user_id, f"roadmap:{course_key}")
+    ).fetchone()["n"]
+    lab_row = conn.execute(
+        "SELECT score, passed FROM coding_labs WHERE user_id=? AND course_key=? AND lab_no=?",
+        (user_id, course_key, lab_no)
+    ).fetchone()
+    conn.close()
+
+    unlocked = passed_modules >= LAB_TRIGGER_MODULE
+    passed = bool(lab_row and lab_row["passed"])
+    return {
+        "has_lab": True,
+        "lab_no": lab_no,
+        "unlocked": unlocked,
+        "passed": passed,
+        "score": lab_row["score"] if lab_row else None,
+        "trigger_after_module": LAB_TRIGGER_MODULE,
+        "modules_passed_so_far": passed_modules,
+    }
+
+
+@app.post("/api/roadmap/{course_key}/lab/{lab_no}/complete")
+def lab_complete(course_key: str, lab_no: int, body: LabCompleteBody,
+                 authorization: Optional[str] = Header(None)):
+    """Save lab score, credit competency points if passed (≥60%)."""
+    user_id = require_writable_user(authorization)
+    import roadmap_data
+    c = roadmap_data.get_course(course_key)
+    if not c or "lab_after_module" not in c:
+        raise HTTPException(404, "Lab not found for this course")
+
+    # Validate score range
+    score = max(0.0, min(100.0, float(body.score)))
+    passed = score >= 60.0
+
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO coding_labs (user_id, course_key, lab_no, code_submitted, score, passed) "
+        "VALUES (?,?,?,?,?,?) "
+        "ON CONFLICT(user_id, course_key, lab_no) DO UPDATE SET "
+        "code_submitted=excluded.code_submitted, score=excluded.score, "
+        "passed=excluded.passed, submitted_at=datetime('now')",
+        (user_id, course_key, lab_no, body.code_submitted, score, int(passed))
+    )
+    conn.commit()
+    conn.close()
+
+    # Credit competency points for passing the lab
+    if passed:
+        lab_areas = c.get("areas", [])
+        area_scores = {area: min(100, score) for area in lab_areas}
+        ge.update_competency(user_id, area_scores)
+        ge.log_event(user_id, "lab_completed",
+                     {"course_key": course_key, "lab_no": lab_no, "score": score,
+                      "areas": lab_areas})
+        _, key = _user_department(user_id)
+        gaps = ge.compute_gaps(user_id, key, _user_context(user_id)[2])
+        ge.build_roadmap(user_id, key, COURSES, gaps, completed_ids=_completed_ids(user_id))
+        readiness_pct = gaps["readiness_pct"]
+    else:
+        readiness_pct = None
+
+    return {
+        "score": score,
+        "passed": passed,
+        "problems_passed": body.problems_passed,
+        "problems_total": body.problems_total,
+        "readiness_pct": readiness_pct,
+        "message": (
+            "🎉 Lab passed! Module 3 is now unlocked. Competency points credited."
+            if passed else
+            f"Score {score:.0f}% — you need 60% to pass. At least {body.problems_total - body.problems_passed} more problem(s) to solve. Try again!"
+        ),
+    }
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "demo_user": DEMO_USER["email"], "courses": len(COURSES)}
+
 
 
 @app.post("/api/admin/seed-demo-data")

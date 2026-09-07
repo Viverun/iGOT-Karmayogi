@@ -75,6 +75,7 @@ if (requireAuth() && !redirectIfAdmin()) {
   const courseKey = new URLSearchParams(location.search).get("course");
   const LS_KEY = "lesson_done_" + (getUser()?.email || "anon") + "_" + courseKey;
   let currentCourse = null, currentQuiz = null, currentModuleNo = null, playingLesson = null;
+  let labStatus = null;   // { has_lab, unlocked, passed, score, trigger_after_module }
   // prefetch lesson quizzes in the background the moment a lesson is opened
   const quizPrefetch = {};   // "moduleNo:videoNo" -> Promise
   function prefetchLessonQuiz(moduleNo, videoNo) {
@@ -156,8 +157,17 @@ if (requireAuth() && !redirectIfAdmin()) {
   }
   function lessonUnlocked(idx) {
     if (idx === 0) return true;
+    const item = flatLessons()[idx];
+    // If the module itself is already completed, all its lessons are unlocked
+    if (currentCourse.completed_modules && currentCourse.completed_modules[String(item.mi + 1)] !== undefined) {
+      return true;
+    }
+    // If the previous module is completed, the first lesson of this module is unlocked
+    if (item.vi === 0 && item.mi > 0 && currentCourse.completed_modules && currentCourse.completed_modules[String(item.mi)] !== undefined) {
+      return true;
+    }
     const prev = flatLessons()[idx - 1];
-    return lessonPassed(prev.mi, prev.vi);
+    return lessonPassed(prev.mi, prev.vi) || (currentCourse.completed_modules && currentCourse.completed_modules[String(prev.mi + 1)] !== undefined);
   }
 
   function refreshModuleBadges() {
@@ -171,7 +181,9 @@ if (requireAuth() && !redirectIfAdmin()) {
           <span class="text-emerald-700 font-semibold">✔ Module completed — ${currentCourse.completed_modules[String(mi + 1)]}%</span></div>`;
       } else {
         const doneCount = m.videos.filter((_, vi) => doneSet().has(lessonId(mi, vi))).length;
-        const prevPassed = mi === 0 || lessonPassed(mi - 1, currentCourse.modules[mi - 1].videos.length - 1);
+        const prevPassed = mi === 0 || 
+          lessonPassed(mi - 1, currentCourse.modules[mi - 1].videos.length - 1) ||
+          (currentCourse.completed_modules && currentCourse.completed_modules[String(mi)] !== undefined);
         el.disabled = !(ready && prevPassed);
         el.className = "w-full py-2 rounded-full text-sm font-semibold " +
           (ready && prevPassed ? "bg-orange-400 text-white hover:bg-orange-500" : "bg-slate-100 text-slate-400 cursor-not-allowed");
@@ -209,17 +221,69 @@ if (requireAuth() && !redirectIfAdmin()) {
         <div class="h-2 bg-slate-100 rounded-full"><div class="h-2 bg-blue-600 rounded-full" style="width:${c.progress_pct}%"></div></div>
       </div>`;
 
-    document.getElementById("modules").innerHTML = c.modules.map((m, mi) => `
+    // Fetch lab status for this course (non-blocking — defaults to no-lab)
+    try {
+      labStatus = await api(`/api/roadmap/${courseKey}/lab/1/status`);
+    } catch (_) {
+      labStatus = { has_lab: false };
+    }
+    const LAB_TRIGGER = labStatus.has_lab ? (labStatus.trigger_after_module || 1) : null;
+    const labLocked   = labStatus.has_lab && !labStatus.unlocked;
+    const labPassed   = labStatus.has_lab && labStatus.passed;
+
+    // Build lab card HTML (inserted between module LAB_TRIGGER and LAB_TRIGGER+1)
+    function labCardHtml() {
+      if (!labStatus.has_lab) return "";
+      const locked   = !labStatus.unlocked;
+      const passed   = labStatus.passed;
+      const score    = labStatus.score;
+      const stateIcon  = passed ? "✅" : (locked ? "🧪" : "🧪");
+      const stateLabel = passed ? `Passed — ${score?.toFixed(0)}%` : (locked ? `Module 1 completed · Direct access ready` : "Ready to attempt");
+      const btnClass = passed
+        ? "w-full py-2 rounded-full text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-600 cursor-pointer"
+        : "w-full py-2 rounded-full text-sm font-semibold bg-orange-400 text-white hover:bg-orange-500 cursor-pointer shadow-sm";
+      const onclick = `onclick="location.href='lab.html?course=${courseKey}&lab=1'"`;
+      return `
+      <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border-2 ${passed ? 'border-emerald-300' : 'border-orange-300'} shadow-sm overflow-hidden my-2">
+        <div class="p-4 flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full flex items-center justify-center text-lg ${passed ? 'bg-emerald-100' : 'bg-orange-100'}">${stateIcon}</div>
+          <div class="flex-1">
+            <span class="block text-sm font-bold ${passed ? 'text-emerald-700' : 'text-orange-700'}">🧪 Hands-On Lab</span>
+            <span class="block text-xs text-slate-500">${stateLabel}</span>
+          </div>
+          ${!passed ? `<span class="text-[10px] font-bold bg-orange-500 text-white px-2.5 py-0.5 rounded-full">ACTION REQUIRED</span>` : ''}
+        </div>
+        <div class="px-4 pb-4 flex gap-2">
+          <button ${onclick} class="${btnClass}">
+            ${passed ? "Retake Lab" : "🚀 Start Hands-On Lab Now →"}
+          </button>
+        </div>
+      </div>`;
+    }
+
+    // Render modules, inserting lab card after module at index LAB_TRIGGER-1
+    const moduleCards = c.modules.map((m, mi) => {
+      const moduleNo = mi + 1;
+      // Gate modules after the lab trigger if lab exists and not yet passed
+      const gatedByLab = labStatus.has_lab && !labPassed && moduleNo > LAB_TRIGGER;
+      return `
       <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <button onclick="toggleModule(${mi})" class="w-full text-left p-4 flex items-center gap-3 hover:bg-slate-50">
-          <span class="w-8 h-8 rounded-full font-bold flex items-center justify-center text-sm ${c.completed_modules && c.completed_modules[String(mi + 1)] !== undefined ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-50 text-blue-700'}">${c.completed_modules && c.completed_modules[String(mi + 1)] !== undefined ? '✔' : mi + 1}</span>
+          <span class="w-8 h-8 rounded-full font-bold flex items-center justify-center text-sm ${c.completed_modules && c.completed_modules[String(mi + 1)] !== undefined ? 'bg-emerald-100 text-emerald-700' : gatedByLab ? 'bg-amber-50 text-amber-500' : 'bg-blue-50 text-blue-700'}">${c.completed_modules && c.completed_modules[String(mi + 1)] !== undefined ? '✔' : gatedByLab ? '🔒' : mi + 1}</span>
           <span class="flex-1">
             <span class="block text-sm font-semibold text-slate-800">${m.title}</span>
-            <span class="block text-xs text-slate-400">${m.videos.length} lesson${m.videos.length === 1 ? '' : 's'}</span>
+            <span class="block text-xs text-slate-400">${gatedByLab ? '🔒 Complete the Hands-On Lab to unlock' : m.videos.length + ' lesson' + (m.videos.length === 1 ? '' : 's')}</span>
           </span>
         </button>
         <div id="mb${mi}" class="module-body ${mi === 0 ? '' : 'hidden'} border-t border-slate-100">
-          ${m.videos.map((v, vi) => {
+          ${gatedByLab ? `
+          <div class="p-5 text-center text-sm text-slate-400">
+            <p class="text-2xl mb-2">🔒</p>
+            <p class="font-semibold text-slate-500">Lab Required</p>
+            <p class="text-xs mt-1">Pass the Hands-On Lab between Modules ${LAB_TRIGGER} and ${LAB_TRIGGER+1} to unlock these lessons.</p>
+            <button onclick="location.href='lab.html?course=${courseKey}&lab=1'" class="mt-3 px-5 py-2 rounded-full text-xs font-semibold bg-orange-400 text-white hover:bg-orange-500">Open Lab →</button>
+          </div>` :
+          m.videos.map((v, vi) => {
             const flatIdx = flatLessons().findIndex(f => f.mi === mi && f.vi === vi);
             const lessonUnlockedIdx = lessonUnlocked(flatIdx);
             const lessonScore = lessonScores()[`${mi + 1}:${vi + 1}`];
@@ -242,7 +306,15 @@ if (requireAuth() && !redirectIfAdmin()) {
               class="w-full py-2 rounded-full text-sm font-semibold bg-slate-100 text-slate-400 cursor-not-allowed">Complete all lessons to unlock quiz</button>
           </div>
         </div>
-      </div>`).join("");
+      </div>`;
+    });
+
+    // Inject lab card between module LAB_TRIGGER-1 and LAB_TRIGGER (0-indexed)
+    if (labStatus.has_lab && LAB_TRIGGER <= c.modules.length) {
+      moduleCards.splice(LAB_TRIGGER, 0, labCardHtml());
+    }
+    document.getElementById("modules").innerHTML = moduleCards.join("");
+
     // show completed ticks
     const s = doneSet();
     document.querySelectorAll("[data-done]").forEach(el => {
