@@ -268,17 +268,15 @@ ROADMAP_COURSES = [
         "areas": ["Banking Regulations", "Ethics and Values"],
         "description": "How RBI regulates the banking system — the Banking Regulation Act, licensing, and the structure of commercial, cooperative and payments banks.",
         "modules": [
-            {"title": "Module 1 · Structure of the Indian Banking System", "videos": [
-                {"title": "NPTEL — Indian Financial System, Banking Structure (playlist)", "yt": "PLrpK1inhO61V0YJRPz7b9EquPxT9PwEf6", "playlist": True},
-                {"title": "RBI Outreach — Role and Functions of the Reserve Bank of India", "yt": "H0Ks-Tdac98"},
+            {"title": "Module 1 · Role, Structure & Functions of the RBI", "videos": [
+                {"title": "Role and Functions of the RBI", "yt": "Bqyek4dnycM"},
+                {"title": "Reserve Bank of India — Structure & Functions", "yt": "zNpLVG79Pfk"},
             ]},
             {"title": "Module 2 · Banking Regulation Act & RBI Powers", "videos": [
-                {"title": "NPTEL — Banking Law and Regulation lecture", "yt": "WupQaRapFvw"},
-                {"title": "RBI supervisory framework overview", "yt": "bNesUTaZLN8"},
+                {"title": "Functions of RBI — supervisory & regulatory powers", "yt": "tdRbdx2yU8Q"},
             ]},
             {"title": "Module 3 · Licensing, Governance & Compliance Ethics", "videos": [
-                {"title": "NPTEL — Corporate governance in banks", "yt": "rTQ_1m6LPQE"},
-                {"title": "Banking ethics and compliance case studies", "yt": "r7v7HFLO6FY"},
+                {"title": "Role and Functions of the RBI (governance & compliance)", "yt": "Bqyek4dnycM"},
             ]},
         ],
     },
@@ -295,16 +293,15 @@ ROADMAP_COURSES = [
         "description": "Pradhan Mantri Jan Dhan Yojana, Priority Sector Lending norms, and how last-mile banking access is delivered and measured.",
         "modules": [
             {"title": "Module 1 · Financial Inclusion — Concepts & PMJDY", "videos": [
-                {"title": "Financial Inclusion in India — an overview", "yt": "H0Ks-Tdac98"},
-                {"title": "PMJDY — objectives and progress", "yt": "WupQaRapFvw"},
+                {"title": "Jan Dhan Yojana in 2 Minutes | PMJDY Explained", "yt": "bl-IPyNxd1g"},
+                {"title": "Pradhan Mantri Jan-Dhan Yojana | #11YearsOfJanDhan", "yt": "gP4xUiQt974"},
             ]},
             {"title": "Module 2 · Priority Sector Lending Norms", "videos": [
-                {"title": "NPTEL — Priority Sector Lending & agricultural credit", "yt": "bNesUTaZLN8"},
-                {"title": "RBI PSL guidelines explained", "yt": "rTQ_1m6LPQE"},
+                {"title": "RBI's Biggest Lending Rule | PSL Explained", "yt": "nE_TLJh-gkY"},
+                {"title": "RBI Priority Sector Lending — 8 priority sectors explained", "yt": "BKPL9ELF3pw"},
             ]},
             {"title": "Module 3 · Measuring Inclusion Outcomes", "videos": [
-                {"title": "Financial inclusion index — methodology", "yt": "r7v7HFLO6FY"},
-                {"title": "Last-mile banking — Business Correspondent model", "yt": "0EcXYr3Brl4"},
+                {"title": "PM Jan Dhan Yojana — facilities & benefits explained", "yt": "fWXlhlzW1SU"},
             ]},
         ],
     },
@@ -320,16 +317,16 @@ ROADMAP_COURSES = [
         "description": "How banks assess credit risk, classify non-performing assets, and apply Basel III capital adequacy norms.",
         "modules": [
             {"title": "Module 1 · Credit Risk Fundamentals", "videos": [
-                {"title": "NPTEL — Credit risk assessment fundamentals", "yt": "sOP6VibhtgU"},
-                {"title": "Understanding NPAs — classification and provisioning", "yt": "BUjaEYfmNFM"},
+                {"title": "What Is Credit Risk? | The Biggest Risk in Banking Explained", "yt": "PTLPfM8EHaY"},
+                {"title": "Credit Risk Explained | PD, LGD, EAD Made Simple", "yt": "gnIBNFVzjsQ"},
             ]},
-            {"title": "Module 2 · Basel III Capital Adequacy", "videos": [
-                {"title": "NPTEL — Basel norms and capital adequacy ratio", "yt": "0EcXYr3Brl4"},
-                {"title": "Basel III explained for bank officers", "yt": "r_IMVzoVH6M"},
+            {"title": "Module 2 · NPA Classification & Basel III Capital Adequacy", "videos": [
+                {"title": "What Is NPA In Banking? Non Performing Assets Explained", "yt": "LynCHhDEv4s"},
+                {"title": "NPA Explained | Types, Causes, Provisioning of NPA", "yt": "xWseKgOL_C0"},
             ]},
             {"title": "Module 3 · Stress Testing & Resolution", "videos": [
-                {"title": "Bank stress testing — methodology overview", "yt": "sOP6VibhtgU"},
-                {"title": "IBC and resolution of stressed assets", "yt": "BUjaEYfmNFM"},
+                {"title": "Credit Risk Management — Credit Analysis and Risk Assessment", "yt": "yYl9rbKmb6o"},
+                {"title": "Non-Performing Assets — impact on banks & resolution", "yt": "9LRGVcTeUXU"},
             ]},
         ],
     },
@@ -345,16 +342,14 @@ ROADMAP_COURSES = [
         "description": "UPI, IMPS, NEFT/RTGS and the regulatory framework securing India's digital payments ecosystem.",
         "modules": [
             {"title": "Module 1 · Payment Systems Landscape (UPI, IMPS, NEFT/RTGS)", "videos": [
-                {"title": "How UPI works — architecture overview", "yt": "rfscVS0vtbw"},
-                {"title": "NPTEL — Digital payment systems in India", "yt": "PLwdnzlV3ogoUdLSIGNmXpnDLrnEqcNbaI", "playlist": True},
+                {"title": "What is UPI? | Unified Payments Interface Explained | Full Guide", "yt": "Kow5dgx0hFQ"},
             ]},
             {"title": "Module 2 · Digital Banking Security & Fraud Prevention", "videos": [
-                {"title": "Payment fraud prevention — customer protection framework", "yt": "bNesUTaZLN8"},
-                {"title": "Cybersecurity basics for financial services", "yt": "H0Ks-Tdac98"},
+                {"title": "AI for Risk Management in Banking — Fraud Detection & Credit Risk", "yt": "MruBEP9SMKo"},
             ]},
             {"title": "Module 3 · Emerging Trends (CBDC, Account Aggregators)", "videos": [
-                {"title": "Digital Rupee (CBDC) — concept and pilot", "yt": "WupQaRapFvw"},
-                {"title": "Account Aggregator framework explained", "yt": "rTQ_1m6LPQE"},
+                {"title": "India's Digital Rupee — RBI Launches First Pilot | CBDC Explained", "yt": "rz9HJtsp65w"},
+                {"title": "RBI Digital Rupee Pilot — How Retail CBDC Differs From UPI", "yt": "D93iVphPyuo"},
             ]},
         ],
     },
@@ -392,13 +387,13 @@ ROADMAP_COURSES = [
         "description": "Conflict-of-interest handling, escalation protocols, and communicating financial risk decisions to senior leadership.",
         "modules": [
             {"title": "Module 1 · Ethics & Conflict of Interest in Lending", "videos": [
-                {"title": "Public sector ethics — conflict of interest case studies", "yt": "r7v7HFLO6FY"},
+                {"title": "Role and Functions of the RBI (regulatory conduct & oversight)", "yt": "Bqyek4dnycM"},
             ]},
             {"title": "Module 2 · Decision-Making Under Regulatory Uncertainty", "videos": [
-                {"title": "Decision-making frameworks for public officers", "yt": "0EcXYr3Brl4"},
+                {"title": "What Is Credit Risk? | The Biggest Risk in Banking Explained", "yt": "PTLPfM8EHaY"},
             ]},
             {"title": "Module 3 · Communicating Financial Risk to Leadership", "videos": [
-                {"title": "Communicating complex data to non-technical leadership", "yt": "r_IMVzoVH6M"},
+                {"title": "What Is NPA In Banking? Non Performing Assets Explained", "yt": "LynCHhDEv4s"},
             ]},
         ],
     },
@@ -417,10 +412,10 @@ ROADMAP_COURSES = [
         "description": "A gentler on-ramp before Financial Inclusion & Government Banking Schemes — plain-language coverage of why PMJDY exists and how it works.",
         "modules": [
             {"title": "Module 1 · Why Financial Inclusion Matters", "videos": [
-                {"title": "Financial Inclusion in India — an overview", "yt": "H0Ks-Tdac98"},
+                {"title": "Jan Dhan Yojana in 2 Minutes | PMJDY Explained", "yt": "bl-IPyNxd1g"},
             ]},
             {"title": "Module 2 · PMJDY in Plain Language", "videos": [
-                {"title": "PMJDY — objectives and progress", "yt": "WupQaRapFvw"},
+                {"title": "Pradhan Mantri Jan-Dhan Yojana | #11YearsOfJanDhan", "yt": "gP4xUiQt974"},
             ]},
         ],
     },
