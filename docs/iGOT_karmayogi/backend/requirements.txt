@@ -1,7 +1,0 @@
-fastapi>=0.115.0
-uvicorn>=0.30.0
-pydantic>=2.7.0
-scikit-learn>=1.4.0
-numpy>=1.26.0
-python-multipart>=0.0.9
-pypdf>=4.0.0

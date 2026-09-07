@@ -26,6 +26,7 @@ from gap_engine import chapters_for
 import gap_engine as ge
 import materials as mat_engine
 import llm
+import privacy
 from llm import KNOWLEDGE_QUIZ_PROMPT
 
 init_db()
@@ -122,6 +123,19 @@ def require_admin(auth_header: Optional[str]) -> int:
     return user_id
 
 
+def require_writable_user(auth_header: Optional[str]) -> int:
+    """Same as require_user, but 403s for 'readonly' accounts. Use on every
+    endpoint that submits an assessment/quiz, enrolls, completes a course,
+    or otherwise writes learner state."""
+    user_id = require_user(auth_header)
+    conn = get_db()
+    row = conn.execute("SELECT role FROM users WHERE id=?", (user_id,)).fetchone()
+    conn.close()
+    if row and row["role"] == "readonly":
+        raise HTTPException(403, "This account is read-only and cannot submit or modify data")
+    return user_id
+
+
 # ---------- Auth (dummy) ----------
 
 class AuthBody(BaseModel):
@@ -153,7 +167,7 @@ def register(body: AuthBody):
 def login(body: AuthBody):
     conn = get_db()
     row = conn.execute(
-        "SELECT id, name, email, designation, department FROM users WHERE email = ? AND password = ?",
+        "SELECT id, name, email, designation, department, role FROM users WHERE email = ? AND password = ?",
         (body.email, body.password),
     ).fetchone()
     if not row:
@@ -162,11 +176,14 @@ def login(body: AuthBody):
     token = secrets.token_hex(16)
     conn.execute("INSERT INTO tokens (token, user_id) VALUES (?,?)", (token, row["id"]))
     conn.commit()
+    has_history = conn.execute(
+        "SELECT 1 FROM assessment_results WHERE user_id = ?", (row["id"],)).fetchone() is not None
     conn.close()
     return {
         "access_token": token,  # dummy token, not a real JWT
         "token_type": "bearer",
-        "user": {k: row[k] for k in ("name", "email", "designation", "department")},
+        "user": {k: row[k] for k in ("name", "email", "designation", "department", "role")},
+        "has_history": has_history,
     }
 
 
@@ -209,7 +226,7 @@ def me(authorization: Optional[str] = Header(None)):
     user_id = require_user(authorization)
     conn = get_db()
     row = conn.execute(
-        "SELECT name, email, designation, department FROM users WHERE id = ?", (user_id,)
+        "SELECT name, email, designation, department, role FROM users WHERE id = ?", (user_id,)
     ).fetchone()
     conn.close()
     return row
@@ -1412,7 +1429,8 @@ def chat(body: ChatBody, authorization: Optional[str] = Header(None)):
     reply, intent, course_key, mode = None, "general", None, "fallback"
     if llm.llm_available():
         try:
-            raw = llm.generate(CHAT_SYSTEM_PROMPT.format(context=context, message=body.message), max_tokens=1500)
+            safe_message = privacy.redact_pii(body.message)
+            raw = llm.generate(CHAT_SYSTEM_PROMPT.format(context=context, message=safe_message), max_tokens=1500)
             raw = raw.strip()
             if raw.startswith("```"):
                 raw = raw.split("```")[1]
