@@ -342,5 +342,45 @@ def department_key(department: str) -> str:
     return "general"
 
 
-def questions_for(department: str) -> list:
-    return QUESTION_BANK[department_key(department)]
+def _experience_band(years: int | None) -> str:
+    years = years or 0
+    if years < 3:
+        return "junior"
+    if years < 8:
+        return "mid"
+    return "senior"
+
+
+# Difficulty a Karmayogi should meet first, by years of service — junior officers
+# start on recall/foundation questions, senior officers get analytical ones up
+# front. This only REORDERS the assessment (every question is still asked —
+# nothing is hidden), so it never reduces coverage for a small department bank.
+_LEVEL_ORDER_BY_BAND = {
+    "junior": ["L1", "L2", "L3"],
+    "mid": ["L2", "L1", "L3"],
+    "senior": ["L3", "L2", "L1"],
+}
+
+
+def questions_for(department: str, role_id: str | None = None, work_experience_years: int | None = None) -> list:
+    """Full department question bank, personalized to the officer's profile:
+    - role_id (resolved from their designation/department, see ontology.resolve_role_id)
+      surfaces questions in that role's higher-weighted competency areas first.
+    - work_experience_years paces difficulty — junior officers see foundational
+      questions first, senior officers see analytical ones first.
+    Coverage is never reduced — this only reorders the same full bank, so a
+    small department's pool (e.g. 6-10 questions) is never trimmed further."""
+    bank = list(QUESTION_BANK[department_key(department)])
+    if not bank:
+        return bank
+
+    role_areas = set()
+    if role_id:
+        from ontology import ROLE_PROFILES
+        profile = ROLE_PROFILES.get(role_id)
+        if profile:
+            role_areas = set(profile["targets"])
+
+    level_rank = {lvl: i for i, lvl in enumerate(_LEVEL_ORDER_BY_BAND[_experience_band(work_experience_years)])}
+    bank.sort(key=lambda q: (0 if q["area"] in role_areas else 1, level_rank.get(q["level"], 99)))
+    return bank

@@ -163,7 +163,7 @@ if (requireAuth() && !redirectIfAdmin()) {
         : `${d.verified_completions} verified course${d.verified_completions > 1 ? "s" : ""} · cap ${d.readiness_cap}%`;
     }
     document.getElementById("statHours").textContent = d.learning_hours;
-    document.getElementById("statCourses").textContent = d.enrollments.filter(e => e.status === "completed").length + "/" + d.enrollments.length;
+    document.getElementById("statCourses").textContent = d.completed_courses + "/" + d.total_courses;
     document.getElementById("statGaps").textContent = d.top_gaps.length;
 
     // gaps
@@ -306,6 +306,7 @@ if (requireAuth() && !redirectIfAdmin()) {
   }
 
   load().catch(e => showPageError(e.message));
+  window.__refreshRoadmapUI = () => load().catch(e => showPageError(e.message));
   Object.assign(window, { welcomeNext, welcomePrev, enrollFromRoadmap });
 }
 </script>

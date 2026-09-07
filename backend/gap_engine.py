@@ -117,14 +117,17 @@ def competency_vector(user_id: int, department_key: str, role_id: str | None = N
     } for a in areas]
 
 
-def _verified_course_completions(user_id: int) -> int:
+def verified_completions_detail(user_id: int) -> dict:
     """Courses completed with a solid quiz record (avg quiz score >= 60).
     Merely finishing videos isn't enough — the quizzes back it up.
 
     Two course families feed this: iGOT catalogue courses (verified against
     `enrollments.status='completed'`) and roadmap courses (verified by having
     a graded chapter_progress row — course_id 'roadmap:<key>' — for every
-    module the course actually has, per roadmap_data)."""
+    module the course actually has, per roadmap_data). Returns both the count
+    and which specific courses qualified, so callers (e.g. the dashboard's
+    "learning hours" / "X of Y courses" stats) can total up roadmap-course
+    hours too, not just iGOT-catalogue ones."""
     import roadmap_data
 
     conn = get_db()
@@ -135,7 +138,7 @@ def _verified_course_completions(user_id: int) -> int:
         "SELECT course_id FROM enrollments WHERE user_id=? AND status='completed'", (user_id,)).fetchall()}
     conn.close()
 
-    count = 0
+    roadmap_keys, igot_ids = [], []
     for r in rows:
         if r["avg_score"] is None or r["avg_score"] < 60:
             continue
@@ -144,10 +147,14 @@ def _verified_course_completions(user_id: int) -> int:
             key = course_id.split(":", 1)[1]
             course = roadmap_data.get_course(key)
             if course and r["n_modules"] >= len(course["modules"]):
-                count += 1
+                roadmap_keys.append(key)
         elif course_id in completed_igot:
-            count += 1
-    return count
+            igot_ids.append(course_id)
+    return {"count": len(roadmap_keys) + len(igot_ids), "roadmap_keys": roadmap_keys, "igot_ids": igot_ids}
+
+
+def _verified_course_completions(user_id: int) -> int:
+    return verified_completions_detail(user_id)["count"]
 
 
 def compute_gaps(user_id: int, department_key: str, role_id: str | None = None) -> dict:

@@ -89,6 +89,7 @@ const NAV_LINKS = [
   { href: "dashboard.html", label: "Dashboard" },
   { href: "studio.html", label: "Trainer Studio" },
   { href: "admin.html", label: "Analytics" },
+  { href: "profile.html", label: "Profile" },
 ];
 const ADMIN_NAV_LINKS = [
   { href: "admin.html", label: "Admin Dashboard" },
@@ -246,8 +247,11 @@ function renderChatWidget() {
       document.getElementById("chatTyping")?.remove();
       bubble("assistant", res.reply, res.action);
       if (res.action && (res.action.type === "swap_course" || res.action.type === "revert_swap")) {
-        // roadmap changed server-side — refresh dashboard/roadmap views next time they load
-        sessionStorage.setItem("roadmap_dirty", "1");
+        // roadmap changed server-side — refresh the current page's view right now if it
+        // shows roadmap/course data (dashboard.html, course_player.html register this hook),
+        // and mark it dirty as a fallback for any page that doesn't.
+        if (window.__refreshRoadmapUI) window.__refreshRoadmapUI();
+        else sessionStorage.setItem("roadmap_dirty", "1");
       }
     } catch (e) {
       document.getElementById("chatTyping")?.remove();

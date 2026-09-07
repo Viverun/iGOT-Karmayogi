@@ -492,6 +492,7 @@ if (requireAuth() && !redirectIfAdmin()) {
     const first = document.querySelector(".video-row");
     if (first) first.click();
   }).catch(e => showPageError(e.message));
+  window.__refreshRoadmapUI = () => load().catch(e => showPageError(e.message));
 }
 </script>
 </body>
