@@ -206,6 +206,24 @@ def _translate(sql: str) -> str:
     return sql
 
 
+class _CursorResult:
+    """Thin proxy so `.lastrowid` can be a plain settable attribute — psycopg2's
+    own cursor defines `lastrowid` as a read-only descriptor."""
+
+    def __init__(self, cur):
+        self._cur = cur
+        self.lastrowid = None
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    def __iter__(self):
+        return iter(self._cur)
+
+
 class Connection:
     """Wraps a psycopg2 connection to look like sqlite3.Connection for this codebase's usage."""
 
@@ -216,12 +234,12 @@ class Connection:
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         translated = _translate(sql)
         cur.execute(translated, params if params else None)
-        cur.lastrowid = None
+        result = _CursorResult(cur)
         if "RETURNING" in translated.upper():
             row = cur.fetchone()
             if row:
-                cur.lastrowid = row.get("id")
-        return cur
+                result.lastrowid = row.get("id")
+        return result
 
     def executescript(self, sql: str):
         cur = self._conn.cursor()
