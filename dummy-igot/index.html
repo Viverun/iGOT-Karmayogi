@@ -17,8 +17,14 @@
   body { font-family: 'Noto Sans', sans-serif; color: #172b4d; }
   h1, h2, h3, nav, .display-font { font-family: 'Montserrat', sans-serif; }
   .site-header { position: relative; z-index: 20; padding: 1.65rem 1.25rem 1.35rem; background: var(--cream); }
-  .site-nav { max-width: 1620px; min-height: 88px; margin: auto; padding: .75rem 1.35rem; border: 1px solid #c9c9c9; border-radius: 999px; display: flex; align-items: center; gap: 1.5rem; background: #fffdfa; }
+  .site-nav { max-width: 1620px; min-height: 88px; margin: auto; padding: .75rem 1.35rem; border: 1px solid #c9c9c9; border-radius: 999px; display: flex; align-items: center; gap: 1.5rem; background: rgba(255, 253, 250, .72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
   .brand-lockup img { width: 190px; height: 58px; object-fit: contain; }
+  .sih-lockup { display: flex; align-items: center; gap: .6rem; padding-left: 1.15rem; border-left: 1px solid #dcdcdc; }
+  .sih-lockup img { width: auto; height: 46px; object-fit: contain; }
+  .sih-credit { line-height: 1.15; white-space: nowrap; }
+  .sih-credit .sih-credit-eyebrow { display: block; color: #66707f; font-size: .62rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .sih-credit .sih-credit-team { display: flex; align-items: center; gap: .3rem; color: #263d63; font-size: .82rem; font-weight: 700; }
+  .sih-credit .sih-credit-team img { width: auto; height: 17px; object-fit: contain; }
   .nav-link { position: relative; color: #263d63; font-size: .9rem; font-weight: 600; transition: color .2s ease; }
   .nav-link:hover { color: var(--orange); }
   .nav-link::after { content: ''; position: absolute; left: 0; right: 100%; bottom: -.45rem; height: 2px; background: var(--orange); transition: right .2s ease; }
@@ -101,6 +107,8 @@
   @media (max-width: 900px) {
     .site-nav { min-height: 72px; padding: .45rem 1rem; }
     .brand-lockup img { width: 165px; height: 48px; }
+    .sih-lockup { gap: .45rem; padding-left: .8rem; }
+    .sih-lockup img { height: 38px; }
     .site-links { display: none; }
     .menu-button { display: block; }
     .hero-inner { grid-template-columns: 1fr; gap: 3rem; padding-top: 3.5rem; }
@@ -111,6 +119,9 @@
     .site-header { padding: 1rem .5rem; }
     .site-nav { gap: .5rem; }
     .brand-lockup img { width: 135px; height: 42px; }
+    .sih-lockup { padding-left: .55rem; }
+    .sih-lockup img { height: 30px; }
+    .sih-credit { display: none; }
     .outline-btn, .solid-btn { padding: .62rem 1rem; font-size: .8rem; }
     .hero-inner { padding: 2.5rem 1.25rem 3.5rem; }
     .hero-copy h1 { font-size: 1.7rem; }
@@ -154,6 +165,15 @@
     <a href="#" class="brand-lockup shrink-0" aria-label="iGOT Karmayogi home">
       <img src="assets/Images/karmayogiLogo.svg" alt="कर्मयोगी भारत" />
     </a>
+    <div class="sih-lockup shrink-0">
+      <img src="assets/SIH2026-logo.png" alt="Smart India Hackathon 2026" />
+      <span class="sih-credit">
+        <span class="sih-credit-eyebrow">Demonstrated by</span>
+        <span class="sih-credit-team">
+          <img src="assets/team-kruskal-mark.png" alt="" aria-hidden="true" />Team Kruskal
+        </span>
+      </span>
+    </div>
     <ul class="site-links hidden lg:flex items-center gap-6 ml-2">
       <li><a class="nav-link" href="#">About Us</a></li>
       <li><a class="nav-link" href="#">Newsroom</a></li>

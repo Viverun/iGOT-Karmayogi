@@ -155,7 +155,23 @@ def translate_texts(body: TranslateRequest):
         return {"translated": body.texts}
 
     target = body.target_lang.lower().strip()
-    results = [_translate_single_text(t, target) for t in body.texts]
+
+    # Each _translate_single_text() is a blocking HTTP call to Google (~480ms).
+    # Serially that made a language switch cost ~480ms x every string on the
+    # page — 25s for 50 strings. urlopen releases the GIL while waiting, so a
+    # bounded thread pool overlaps the waits. Workers stay modest deliberately:
+    # the translate endpoint rate-limits (HTTP 429) if hit with a large burst,
+    # and a 429 falls through to the slower MyMemory path, which would trade
+    # one stall for another.
+    import os
+    workers = max(1, min(int(os.environ.get("TRANSLATE_WORKERS", "8")), len(body.texts)))
+    if workers == 1:
+        results = [_translate_single_text(t, target) for t in body.texts]
+    else:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            # pool.map preserves input order, so results stay aligned with texts
+            results = list(pool.map(lambda t: _translate_single_text(t, target), body.texts))
     return {"translated": results}
 
 
