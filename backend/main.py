@@ -318,18 +318,19 @@ def update_profile(body: ProfileUpdateBody, authorization: Optional[str] = Heade
     and when" survives alongside the rest of the officer's history.
 
     Privacy: designation/department are free text an officer could (accidentally
-    or not) type PII into — both are passed through privacy.redact_pii() before
-    storage, the same guard already used on chatbot input, since department also
-    flows into the chatbot's LLM context (see _chat_context)."""
+    or not) type PII into. They are stored verbatim — redaction happens at the
+    point the text is handed to an LLM (see _chat_context), per privacy.py's
+    contract; redacting on write would corrupt the officer's own record and can
+    eat the keywords department_key()/resolve_role_id() match on."""
     user_id = require_writable_user(authorization)
     if body.work_experience_years is not None and not (0 <= body.work_experience_years <= 60):
         raise HTTPException(400, "work_experience_years must be between 0 and 60")
 
     updates = {}
     if body.designation is not None:
-        updates["designation"] = privacy.redact_pii(body.designation.strip())[:200]
+        updates["designation"] = body.designation.strip()[:200]
     if body.department is not None:
-        updates["department"] = privacy.redact_pii(body.department.strip())[:200]
+        updates["department"] = body.department.strip()[:200]
     if body.work_experience_years is not None:
         updates["work_experience_years"] = body.work_experience_years
     if not updates:
@@ -416,9 +417,13 @@ def my_enrollments(authorization: Optional[str] = Header(None)):
         (user_id,),
     ).fetchall()
     conn.close()
+    # A row's course_id can be a roadmap course key (the on-site track, and the
+    # pre-seeded Banking demo history) rather than a catalogue identifier — those
+    # have no COURSES_BY_ID entry, so skip them instead of KeyError-ing the whole
+    # request. /api/dashboard already applies the same guard.
     return [
         {**dict(r), "course": course_to_content(COURSES_BY_ID[r["course_id"]])}
-        for r in rows
+        for r in rows if r["course_id"] in COURSES_BY_ID
     ]
 
 
@@ -1016,13 +1021,19 @@ def dashboard(authorization: Optional[str] = Header(None)):
     user_id = require_user(authorization)
     dept, key, role_id = _user_context(user_id)
     gaps = ge.compute_gaps(user_id, key, role_id)
-    roadmap_row = get_db().execute("SELECT data_json FROM roadmaps WHERE user_id=?", (user_id,)).fetchone()
+    # One connection for every query in this handler: get_db() opens a fresh
+    # Postgres connection each call, so the old shape (four separate get_db()s,
+    # one of them never closed) leaked a socket per dashboard load.
     conn = get_db()
-    profile = conn.execute("SELECT name, email, designation, department, role FROM users WHERE id=?",
-                           (user_id,)).fetchone()
+    roadmap_row = conn.execute("SELECT data_json FROM roadmaps WHERE user_id=?", (user_id,)).fetchone()
+    profile = conn.execute(
+        "SELECT name, email, designation, department, role, work_experience_years FROM users WHERE id=?",
+        (user_id,)).fetchone()
     enrollments = conn.execute(
         "SELECT e.id, e.course_id, e.status, e.progress_pct, e.updated_at FROM enrollments e WHERE e.user_id=?",
         (user_id,)).fetchall()
+    assessment_done = conn.execute(
+        "SELECT COUNT(*) AS n FROM assessment_results WHERE user_id=?", (user_id,)).fetchone()["n"] > 0
     conn.close()
     enrollments = [{**dict(e), "course": course_to_content(COURSES_BY_ID[e["course_id"]])}
                    for e in enrollments if e["course_id"] in COURSES_BY_ID]
@@ -1039,10 +1050,6 @@ def dashboard(authorization: Optional[str] = Header(None)):
     completed_courses = len(detail["roadmap_keys"]) + len([e for e in enrollments if e["status"] == "completed"])
     learning_hours = round(igot_hours + roadmap_hours, 1)
 
-    conn = get_db()
-    assessment_done = conn.execute(
-        "SELECT COUNT(*) AS n FROM assessment_results WHERE user_id=?", (user_id,)).fetchone()["n"] > 0
-    conn.close()
     return {
         "profile": {**dict(profile), "role_id": role_id},
         "assessment_done": assessment_done,
@@ -1689,7 +1696,10 @@ def _chat_context(user_id: int) -> str:
     gaps = ge.compute_gaps(user_id, key, role_id)
     swaps = ge.get_active_swaps(user_id)
     roadmap_courses = roadmap_data.get_roadmap(key)
-    lines = [f"Department: {dept}", f"Readiness: {gaps['readiness_pct']}% (cap {gaps['readiness_cap']}%, "
+    # dept is officer-editable free text (PUT /api/profile) and this string goes
+    # straight into an LLM prompt — redact here, at the boundary, not on write.
+    lines = [f"Department: {privacy.redact_pii(dept)}",
+             f"Readiness: {gaps['readiness_pct']}% (cap {gaps['readiness_cap']}%, "
              f"{gaps['verified_completions']} verified course completions)"]
     if gaps["explanations"]:
         lines.append("Top gaps: " + "; ".join(gaps["explanations"][:3]))

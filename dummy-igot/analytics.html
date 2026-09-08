@@ -80,7 +80,10 @@ if (requireAuth() && !redirectIfAdmin()) {
 
     const vector = d.competency_vector || [];
     const scored = vector.filter(v => v.target > 0);
-    const strengths = scored.filter(v => v.gap <= 0).sort((a, b) => b.current - a.current).slice(0, 5);
+    const onTarget = scored.filter(v => v.gap <= 0);
+    // strengths is the display list (top 5); onTarget is the real count — the KPI
+    // below must not read off the sliced array or it caps at 5.
+    const strengths = onTarget.slice().sort((a, b) => b.current - a.current).slice(0, 5);
     const weaknesses = (d.top_gaps || []).slice(0, 5);
 
     const topStrength = strengths[0];
@@ -89,7 +92,7 @@ if (requireAuth() && !redirectIfAdmin()) {
       { label: "role readiness", value: Math.min(100, d.readiness_pct) + "%", sub: `cap ${d.readiness_cap}% · ${d.verified_completions} verified course${d.verified_completions === 1 ? "" : "s"}` },
       { label: "strongest area", value: topStrength ? topStrength.area : "—", sub: topStrength ? `${topStrength.current}/100` : "take the assessment" },
       { label: "biggest gap", value: topWeakness ? topWeakness.area : "—", sub: topWeakness ? `${topWeakness.gap} points behind target` : "no gaps recorded" },
-      { label: "areas on target", value: strengths.length + " / " + scored.length, sub: "current ≥ role target" },
+      { label: "areas on target", value: onTarget.length + " / " + scored.length, sub: "current ≥ role target" },
     ];
     document.getElementById("kpiRow").innerHTML = kpis.map(k => `
       <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">

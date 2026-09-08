@@ -339,6 +339,7 @@ if (requireAuth() && !redirectIfAdmin()) {
     document.getElementById("quizMeta").textContent = "";
     document.getElementById("quizBody").innerHTML = "";
     document.getElementById("quizResult").classList.add("hidden");
+    document.getElementById("quizError").classList.add("hidden");
     document.getElementById("quizControls").classList.add("hidden");
     modal.classList.remove("hidden");
 
@@ -434,8 +435,12 @@ if (requireAuth() && !redirectIfAdmin()) {
       const error = document.getElementById("quizError");
       error.textContent = e.message || "Could not submit the quiz. Please try again.";
       error.classList.remove("hidden");
-      submitBtn.disabled = false;
       return;
+    } finally {
+      // must run on the success path too: #quizSubmitBtn is static markup reused
+      // by every quiz in this page session, so leaving it disabled makes Retry —
+      // and any later quiz — a silent no-op until a full reload.
+      submitBtn.disabled = false;
     }
     document.getElementById("quizControls").classList.add("hidden");
     const res = document.getElementById("quizResult");
@@ -486,8 +491,12 @@ if (requireAuth() && !redirectIfAdmin()) {
       const error = document.getElementById("quizError");
       error.textContent = e.message || "Could not submit the quiz. Please try again.";
       error.classList.remove("hidden");
-      submitBtn.disabled = false;
       return;
+    } finally {
+      // must run on the success path too: #quizSubmitBtn is static markup reused
+      // by every quiz in this page session, so leaving it disabled makes Retry —
+      // and any later quiz — a silent no-op until a full reload.
+      submitBtn.disabled = false;
     }
     document.getElementById("quizControls").classList.add("hidden");
     const res = document.getElementById("quizResult");
@@ -514,6 +523,7 @@ if (requireAuth() && !redirectIfAdmin()) {
 
   function retryModuleQuiz() {
     document.getElementById("quizResult").classList.add("hidden");
+    document.getElementById("quizError").classList.add("hidden");
     document.getElementById("quizBody").innerHTML = "";
     startModuleQuiz(currentModuleNo);
   }
