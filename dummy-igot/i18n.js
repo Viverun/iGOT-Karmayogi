@@ -557,8 +557,10 @@ function getCurrentLanguage() {
  */
 function setLanguage(langCode) {
   localStorage.setItem("igot_lang", langCode);
-  applyTranslations(langCode);
+  // Update the picker first: applyTranslations() is async, so calling it first
+  // left the label to be set while translation was still in flight.
   updateLanguageDropdowns(langCode);
+  return applyTranslations(langCode);
 }
 
 /**
@@ -724,6 +726,12 @@ async function translateDynamicElement(container, lang) {
           return NodeFilter.FILTER_REJECT;
         }
         if (parent.closest('#monaco-editor-container') || parent.closest('#editor-container') || parent.closest('.monaco-editor')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        // Language names are endonyms and must never be translated — doing so
+        // filled the picker with unrelated text and made it impossible to pick
+        // another language. [data-no-translate] opts any other subtree out too.
+        if (parent.closest('.language-picker-root') || parent.closest('[data-no-translate]')) {
           return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_ACCEPT;
