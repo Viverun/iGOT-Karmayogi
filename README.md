@@ -1,4 +1,4 @@
-# SETU-STAT — AI Skill Intelligence & Learning Platform (SIH 26101)
+# SAKSHAM-STAT — AI Skill Intelligence & Learning Platform 
 
 AI-enabled learning platform for capacity building across India's civil services, built as a
 Mission Karmayogi-style skill-intelligence layer and integrated with the iGOT Karmayogi ecosystem
