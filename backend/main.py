@@ -1852,11 +1852,18 @@ def admin_analytics(authorization: Optional[str] = Header(None)):
     users = conn.execute("SELECT id, name, department, designation FROM users WHERE id != 0").fetchall()
     conn.close()
 
+    # Readiness for every user: load their competency/enrolment/chapter rows in
+    # one batch, and derive department/role from the `users` row already fetched
+    # above, so this loop issues no per-user queries at all.
+    from ontology import resolve_role_id
+    prefetch = ge.bulk_context([u["id"] for u in users])
     readiness_rows = []
     for u in users:
         try:
-            dept, key, role_id = _user_context(u["id"])
-            gaps = ge.compute_gaps(u["id"], key, role_id)
+            dept = u["department"] or ""
+            key = department_key(dept)
+            role_id = resolve_role_id(u["designation"] or "", dept)
+            gaps = ge.compute_gaps(u["id"], key, role_id, prefetch=prefetch)
             readiness_rows.append({
                 "user_id": u["id"], "name": u["name"], "department": dept,
                 "designation": u["designation"], "readiness_pct": gaps["readiness_pct"],

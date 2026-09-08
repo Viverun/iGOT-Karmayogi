@@ -88,14 +88,23 @@ def revert_roadmap_course(user_id: int, original_key: str):
     conn.close()
 
 
-def competency_vector(user_id: int, department_key: str, role_id: str | None = None) -> list:
-    """Current vector (assessment + quizzes + completed-course boosts) vs targets."""
+def competency_vector(user_id: int, department_key: str, role_id: str | None = None,
+                      *, prefetch: dict | None = None) -> list:
+    """Current vector (assessment + quizzes + completed-course boosts) vs targets.
+
+    `prefetch` (from bulk_context) lets a caller that needs this for many users
+    — /api/admin/analytics — supply already-loaded rows instead of issuing two
+    queries per user."""
     targets = target_profile(department_key, role_id)
-    conn = get_db()
-    rows = conn.execute("SELECT area, score FROM user_competency WHERE user_id=?", (user_id,)).fetchall()
-    completed = [r["course_id"] for r in conn.execute(
-        "SELECT course_id FROM enrollments WHERE user_id=? AND status='completed'", (user_id,)).fetchall()]
-    conn.close()
+    if prefetch is not None:
+        rows = prefetch["competency"].get(user_id, [])
+        completed = list(prefetch["completed"].get(user_id, []))
+    else:
+        conn = get_db()
+        rows = conn.execute("SELECT area, score FROM user_competency WHERE user_id=?", (user_id,)).fetchall()
+        completed = [r["course_id"] for r in conn.execute(
+            "SELECT course_id FROM enrollments WHERE user_id=? AND status='completed'", (user_id,)).fetchall()]
+        conn.close()
 
     from main import COURSES_BY_ID  # catalogue tags
     boosts = {}
@@ -117,7 +126,39 @@ def competency_vector(user_id: int, department_key: str, role_id: str | None = N
     } for a in areas]
 
 
-def verified_completions_detail(user_id: int) -> dict:
+def bulk_context(user_ids) -> dict:
+    """Load everything compute_gaps() needs for MANY users in 3 queries instead
+    of ~4 per user. Pass the result as compute_gaps(..., prefetch=...).
+
+    /api/admin/analytics computes readiness for every registered user; done one
+    user at a time that is ~5 Supabase round-trips each, which took ~3 minutes
+    at 64 users and grew with every new signup."""
+    ids = list(user_ids)
+    empty = {"competency": {}, "completed": {}, "chapters": {}}
+    if not ids:
+        return empty
+    conn = get_db()
+    try:
+        competency, completed, chapters = {}, {}, {}
+        for r in conn.execute(
+                "SELECT user_id, area, score FROM user_competency WHERE user_id = ANY(?)",
+                (ids,)).fetchall():
+            competency.setdefault(r["user_id"], []).append(r)
+        for r in conn.execute(
+                "SELECT user_id, course_id FROM enrollments "
+                "WHERE status='completed' AND user_id = ANY(?)", (ids,)).fetchall():
+            completed.setdefault(r["user_id"], []).append(r["course_id"])
+        for r in conn.execute(
+                "SELECT user_id, course_id, AVG(quiz_score) AS avg_score, COUNT(*) AS n_modules "
+                "FROM chapter_progress WHERE user_id = ANY(?) GROUP BY user_id, course_id",
+                (ids,)).fetchall():
+            chapters.setdefault(r["user_id"], []).append(r)
+    finally:
+        conn.close()
+    return {"competency": competency, "completed": completed, "chapters": chapters}
+
+
+def verified_completions_detail(user_id: int, *, prefetch: dict | None = None) -> dict:
     """Courses completed with a solid quiz record (avg quiz score >= 60).
     Merely finishing videos isn't enough — the quizzes back it up.
 
@@ -130,13 +171,17 @@ def verified_completions_detail(user_id: int) -> dict:
     hours too, not just iGOT-catalogue ones."""
     import roadmap_data
 
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT course_id, AVG(quiz_score) AS avg_score, COUNT(*) AS n_modules "
-        "FROM chapter_progress WHERE user_id=? GROUP BY course_id", (user_id,)).fetchall()
-    completed_igot = {r["course_id"] for r in conn.execute(
-        "SELECT course_id FROM enrollments WHERE user_id=? AND status='completed'", (user_id,)).fetchall()}
-    conn.close()
+    if prefetch is not None:
+        rows = prefetch["chapters"].get(user_id, [])
+        completed_igot = set(prefetch["completed"].get(user_id, []))
+    else:
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT course_id, AVG(quiz_score) AS avg_score, COUNT(*) AS n_modules "
+            "FROM chapter_progress WHERE user_id=? GROUP BY course_id", (user_id,)).fetchall()
+        completed_igot = {r["course_id"] for r in conn.execute(
+            "SELECT course_id FROM enrollments WHERE user_id=? AND status='completed'", (user_id,)).fetchall()}
+        conn.close()
 
     roadmap_keys, igot_ids = [], []
     for r in rows:
@@ -157,8 +202,9 @@ def _verified_course_completions(user_id: int) -> int:
     return verified_completions_detail(user_id)["count"]
 
 
-def compute_gaps(user_id: int, department_key: str, role_id: str | None = None) -> dict:
-    vector = competency_vector(user_id, department_key, role_id)
+def compute_gaps(user_id: int, department_key: str, role_id: str | None = None,
+                 *, prefetch: dict | None = None) -> dict:
+    vector = competency_vector(user_id, department_key, role_id, prefetch=prefetch)
     scored = [v for v in vector if v["target"] > 0]
 
     # evidence-based readiness:
@@ -169,7 +215,7 @@ def compute_gaps(user_id: int, department_key: str, role_id: str | None = None) 
     #    (course finished + avg quiz score >= 60), +14% each, capped at 100
     base = round(100 * sum(min(v["current"], v["target"]) for v in scored)
                  / max(1, sum(v["target"] for v in scored)))
-    verified = _verified_course_completions(user_id)
+    verified = verified_completions_detail(user_id, prefetch=prefetch)["count"]
     cap = min(100, 30 + 14 * verified)
     readiness = min(base, cap)
 
