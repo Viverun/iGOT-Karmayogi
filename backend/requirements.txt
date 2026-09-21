@@ -7,3 +7,7 @@ pypdf==5.1.0
 python-multipart==0.0.20
 pinecone==6.0.0
 youtube-transcript-api==1.0.1
+numpy>=1.26
+xgboost==3.4.1
+# torch is intentionally NOT required: NCF ranking is optional and falls
+# back to rule-based ordering when torch is absent.

@@ -496,7 +496,29 @@ def get_roadmap_api(authorization: Optional[str] = Header(None)):
                           "modules": [{"title": m["title"], "video_count": len(m["videos"])}
                                       for m in active["modules"]],
                           **({"swapped_from": c["name"]} if replacement_key else {})})
-    return {"assessment_done": True, "department": dept, "courses": resolved}
+    # ML primary: Hybrid-NCF reorder (falls back to roadmap_data order).
+    ml_ranked = False
+    try:
+        import ml_scorers as ml
+        if ml.ncf_available():
+            gaps = ge.compute_gaps(user_id, key)
+            severity = {g["area"]: g["gap"] for g in gaps["top_gaps"]}
+            ranked = []
+            for c in resolved:
+                overlap = set(c["areas"]) & set(severity)
+                w = sum(severity[a] for a in overlap) / max(1, len(overlap)) if overlap else 0
+                s = ml.ncf_score(user_id, c["key"], {
+                    "gap_alignment_score": min(1.0, max(severity.get(a, 0) for a in c["areas"]) / 100.0),
+                    "prerequisite_fit": 0.7, "expected_gain": min(1.0, w / 100.0),
+                    "completion_probability": 0.6, "novelty": 1.0}) or 0.0
+                c["ml_score"] = round(0.6 * w + 0.4 * s * 100.0, 1)
+                ranked.append(c)
+            ranked.sort(key=lambda c: c["ml_score"], reverse=True)
+            resolved, ml_ranked = ranked, True
+    except Exception as e:
+        print("roadmap: ncf rerank skipped, default order:", e)
+    return {"assessment_done": True, "department": dept, "courses": resolved,
+            "ml_ranked": ml_ranked}
 
 
 @app.get("/api/roadmap/{course_key}")
@@ -859,6 +881,13 @@ def lab_complete(course_key: str, lab_no: int, body: LabCompleteBody,
 @app.get("/api/health")
 def health():
     return {"status": "ok", "demo_user": DEMO_USER["email"], "courses": len(COURSES)}
+
+
+@app.get("/api/ml/status")
+def ml_status():
+    """Which engine serves each surface — ML primary, GPT/rules fallback."""
+    import ml_scorers as ml
+    return ml.status()
 
 
 

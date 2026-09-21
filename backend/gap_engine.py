@@ -116,6 +116,24 @@ def competency_vector(user_id: int, department_key: str, role_id: str | None = N
     for area, b in boosts.items():
         current[area] = min(100, current.get(area, 40) + b)
 
+    # ML primary: blend the Kaggle-trained XGBoost estimate 50/50 with the
+    # EWMA store when the artifact + evidence exist. The SAME core runs for
+    # single-user and bulk (admin) paths — only the evidence loading differs —
+    # so dashboard and analytics can never disagree. Any failure -> EWMA.
+    ml_source = {}
+    try:
+        import ml_scorers as ml
+        if ml.xgb_available():
+            evidence = (_evidence_from_prefetch(prefetch, user_id)
+                        if prefetch is not None else _load_evidence(user_id))
+            ml_source = _ml_blend_core(department_key, role_id, targets,
+                                       current, evidence)
+            for area, score in ml_source.items():
+                current[area] = score
+    except Exception as e:
+        print("gap_engine: ml blend skipped, ewma fallback:", e)
+        ml_source = {}
+
     areas = sorted(set(targets) | set(current), key=lambda a: a.lower())
     return [{
         "area": a,
@@ -123,7 +141,86 @@ def competency_vector(user_id: int, department_key: str, role_id: str | None = N
         "current": round(current.get(a, 0), 1),
         "target": targets.get(a, DEFAULT_TARGET if a in current else 0),
         "gap": round(max(0, targets.get(a, DEFAULT_TARGET if a in current else 0) - current.get(a, 0)), 1),
+        "source": "xgb-blend" if a in ml_source else "ewma",
     } for a in areas]
+
+
+def _load_evidence(user_id: int) -> dict:
+    """Single-user evidence for the XGB blend (2 small queries)."""
+    import json as _json
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT scores_json FROM assessment_results WHERE user_id=? "
+            "ORDER BY id DESC LIMIT 1", (user_id,)).fetchone()
+        assessed = _json.loads(row["scores_json"]) if row else {}
+        quiz_rows = conn.execute(
+            "SELECT course_id, AVG(quiz_score) AS avg_score FROM chapter_progress "
+            "WHERE user_id=? GROUP BY course_id", (user_id,)).fetchall()
+        avgs = [r["avg_score"] for r in quiz_rows if r["avg_score"] is not None]
+        urow = conn.execute(
+            "SELECT work_experience_years FROM users WHERE id=?", (user_id,)).fetchone()
+        exp_yrs = float(urow["work_experience_years"] or 0) if urow else 0.0
+    finally:
+        conn.close()
+    return {"assessed": assessed,
+            "quiz_mean": (sum(avgs) / len(avgs)) if avgs else None,
+            "exp_yrs": exp_yrs}
+
+
+def _evidence_from_prefetch(prefetch: dict, user_id: int) -> dict:
+    """Same evidence shape, sourced from bulk_context (no extra queries)."""
+    assessed = prefetch.get("assessed", {}).get(user_id, {})
+    rows = prefetch.get("chapters", {}).get(user_id, [])
+    avgs = [r["avg_score"] for r in rows if r["avg_score"] is not None]
+    return {"assessed": assessed,
+            "quiz_mean": (sum(avgs) / len(avgs)) if avgs else None,
+            "exp_yrs": float(prefetch.get("experience", {}).get(user_id, 0) or 0)}
+
+
+def _ml_blend(user_id: int, department_key: str, role_id: str | None,
+              targets: dict, current: dict) -> dict:
+    """Legacy single-path entry (kept for tests): load + blend."""
+    return _ml_blend_core(department_key, role_id, targets, current,
+                          _load_evidence(user_id))
+
+
+def _ml_blend_core(department_key: str, role_id: str | None,
+                   targets: dict, current: dict, evidence: dict) -> dict:
+    """XGBoost competency estimates per area, 0-100. Returns {} if unusable."""
+    import ml_scorers as ml
+    if not ml.xgb_available():
+        return {}
+    assessed = evidence.get("assessed") or {}
+    quiz_mean = evidence.get("quiz_mean")
+    exp_yrs = float(evidence.get("exp_yrs") or 0)
+    from ontology import COMPETENCY_TYPE
+    skill_order = sorted(COMPETENCY_TYPE)
+    out = {}
+    for area, target in targets.items():
+        a_score = float(assessed.get(area, current.get(area, 50)))
+        q_score = float(quiz_mean if quiz_mean is not None else a_score)
+        channels = 1 + (1 if quiz_mean is not None else 0) + (1 if area in assessed else 0)
+        ev = {
+            "required_level": max(1.0, min(5.0, target / 20.0)),
+            "assessment_score": a_score,
+            "quiz_score": q_score,
+            "practical_score": a_score,
+            "assessment_reliability": 0.85,
+            "evidence_completeness": channels / 3.0,
+            "evidence_count": min(3, channels),
+            "evidence_confidence": 0.9 * channels / 3.0,
+            "recency_weight": 0.8,
+            "experience_years": exp_yrs,
+            "skill_id": skill_order.index(area) % 40 if area in skill_order else 0,
+            "role_id": ml.stable_idx(role_id or department_key, 60),
+        }
+        pred = ml.predict_competency(ev)
+        if pred is None:
+            continue
+        ml100 = max(0.0, min(100.0, pred * 20.0))
+        out[area] = round(0.5 * current.get(area, 50) + 0.5 * ml100, 1)
+    return out
 
 
 def bulk_context(user_ids) -> dict:
@@ -134,7 +231,8 @@ def bulk_context(user_ids) -> dict:
     user at a time that is ~5 Supabase round-trips each, which took ~3 minutes
     at 64 users and grew with every new signup."""
     ids = list(user_ids)
-    empty = {"competency": {}, "completed": {}, "chapters": {}}
+    empty = {"competency": {}, "completed": {}, "chapters": {},
+             "assessed": {}, "experience": {}}
     if not ids:
         return empty
     conn = get_db()
@@ -153,9 +251,25 @@ def bulk_context(user_ids) -> dict:
                 "FROM chapter_progress WHERE user_id = ANY(?) GROUP BY user_id, course_id",
                 (ids,)).fetchall():
             chapters.setdefault(r["user_id"], []).append(r)
+        # ML-blend evidence (same signals as the single-user path):
+        # latest assessment scores + years of experience per user.
+        import json as _json
+        for r in conn.execute(
+                "SELECT DISTINCT ON (user_id) user_id, scores_json FROM assessment_results "
+                "WHERE user_id = ANY(?) ORDER BY user_id, id DESC",
+                (ids,)).fetchall():
+            try:
+                empty["assessed"][r["user_id"]] = _json.loads(r["scores_json"])
+            except Exception:
+                empty["assessed"][r["user_id"]] = {}
+        for r in conn.execute(
+                "SELECT id, work_experience_years FROM users WHERE id = ANY(?)",
+                (ids,)).fetchall():
+            empty["experience"][r["id"]] = r["work_experience_years"] or 0
     finally:
         conn.close()
-    return {"competency": competency, "completed": completed, "chapters": chapters}
+    return {"competency": competency, "completed": completed, "chapters": chapters,
+            "assessed": empty["assessed"], "experience": empty["experience"]}
 
 
 def verified_completions_detail(user_id: int, *, prefetch: dict | None = None) -> dict:
@@ -277,6 +391,13 @@ def build_roadmap(user_id: int, department_key: str, courses: list, gaps: dict,
         ]
         scored_courses.append((weight - prereq_penalty, c, reasons))
 
+    # ML primary: Hybrid-NCF rerank blend (60% rule / 40% NCF). Any failure
+    # (no torch, no weights) keeps the rule-based order above.
+    try:
+        scored_courses = _ncf_rerank(user_id, scored_courses, severity)
+    except Exception as e:
+        print("gap_engine: ncf rerank skipped, rule-based fallback:", e)
+
     scored_courses.sort(key=lambda t: t[0], reverse=True)
     phases = {"1": [], "2": [], "3": []}
     for _, c, reasons in scored_courses:
@@ -304,6 +425,33 @@ def build_roadmap(user_id: int, department_key: str, courses: list, gaps: dict,
     conn.close()
     log_event(user_id, "roadmap_updated", {"total_courses": roadmap["total_courses"]})
     return roadmap
+
+
+def _ncf_rerank(user_id: int, scored: list, severity: dict) -> list:
+    """Blend rule weights with Hybrid-NCF scores. Returns original list if NCF off."""
+    import ml_scorers as ml
+    if not ml.ncf_available() or not scored:
+        return scored
+    wmax = max((w for w, _, _ in scored), default=1) or 1
+    out = []
+    for w, c, reasons in scored:
+        overlap = course_areas(c) & set(severity)
+        max_gap = max((severity[a] for a in overlap), default=0)
+        ctx = {
+            "gap_alignment_score": min(1.0, max_gap / 100.0),
+            "prerequisite_fit": 1.0 if LEVEL_ORDER[c["level"]] == 0 else 0.6,
+            "expected_gain": min(1.0, max(0.0, w) / 100.0),
+            "completion_probability": 0.6,
+            "novelty": 1.0,
+        }
+        s = ml.ncf_score(user_id, c["identifier"], ctx)
+        if s is None:
+            out.append((w, c, reasons))
+            continue
+        blended = 0.6 * w + 0.4 * s * 100.0
+        out.append((blended, c, reasons + [
+            f"ML-ranked (hybrid-NCF score {s:.2f})"]))
+    return out
 
 
 def _enrolled_ids(user_id: int) -> set:

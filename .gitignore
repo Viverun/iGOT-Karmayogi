@@ -1,5 +1,10 @@
 backend/.env
 backend/igot.db
+backend/data/*.tar.gz
+backend/data/*.tgz
+backend/ml/*.csv
+backend/ml/*.pt
+backend/ml/*.ubj
 __pycache__/
 *.pyc
 .venv/
