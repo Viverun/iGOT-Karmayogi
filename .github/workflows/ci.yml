@@ -93,14 +93,20 @@ jobs:
     steps:
       - name: Trigger Render deploy of latest main commit
         env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
-          HTTP=$(curl -s -o /tmp/render_resp.txt -w "%{http_code}" -X POST \
-            "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
-            -H "Authorization: Bearer $RENDER_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{"clearCache": "do_not_clear"}')
-          echo "Render responded: $HTTP"; cat /tmp/render_resp.txt || true
-          case "$HTTP" in 200|201|202) echo "✓ Render deploy triggered ($HTTP)";; *) echo "✗ Render deploy trigger failed"; exit 1;; esac
-          echo "✓ Render deploy triggered"
+          HTTP=$(curl -s -o /tmp/render_resp.txt -w "%{http_code}" \
+            -X POST "$RENDER_DEPLOY_HOOK")
+
+          echo "Render responded: $HTTP"
+          cat /tmp/render_resp.txt || true
+
+          case "$HTTP" in
+            200|201|202)
+              echo "✓ Render deploy triggered ($HTTP)"
+              ;;
+            *)
+              echo "✗ Render deploy trigger failed"
+              exit 1
+              ;;
+          esac
