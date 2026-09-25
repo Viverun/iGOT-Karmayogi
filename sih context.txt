@@ -1,0 +1,36 @@
+## Instructions
+[2026-09-07] - "now push this into the repo but make sure it doent conflict with any of my teamtes pushs on going with working make sure so check everything": Always perform `git fetch` and pull/rebase cleanly before pushing to avoid conflicts with ongoing teammate work.
+[2026-09-07] - "push everything on the repo make i think vercel isnt allowing others to deploy do leave the deployment part to the owner jamil but make sure nothing is getting conflicts anywhere": Never attempt direct production deployment to Vercel; push code to GitHub and leave Vercel deployments strictly to repository owner Jamil.
+[2026-09-07] - "make sure its detto same as the currect lastest repo nothing should be left out check if all nessasary requirements and dependencies are keep and all setted up": Ensure local state is strictly identical to `origin/main`, maintaining all dependencies, configurations, and schema compatibilities.
+[2026-09-07] - "give me prompt not the image and backgriynd must be white": Provide pure prompt text specifications for presentation diagrams with white backgrounds (#FFFFFF) rather than dark background rendered images.
+
+## Identity
+[unknown] - Core developer and contributor on the Smart India Hackathon (SIH) project team building the iGOT Karmayogi capacity-building platform alongside teammates Jamil (repository owner/deployer), Avanish, and Viverun.
+
+## Career
+[unknown] - Full-stack developer and AI systems engineer participating in Smart India Hackathon (SIH), building scalable government e-learning, competency mapping, and LLM-driven assessment systems using Python FastAPI, PostgreSQL (Supabase), Azure OpenAI, Pinecone, Vanilla JS, and Tailwind CSS.
+
+## Projects
+[2026-09-07] - iGOT-Karmayogi: Comprehensive capacity building and AI-driven competency training platform for civil servants (GitHub: https://github.com/Viverun/iGOT-Karmayogi.git). Architecture consists of:
+  - Frontend (`dummy-igot/`): Static Single-Page Application using HTML5, Tailwind CSS, Lucide icons, Monaco Code Editor, and in-browser Pyodide Python execution runtime. All pages point to the production backend `https://igot-karmayogi-zs8h.onrender.com`.
+  - Backend (`backend/`): FastAPI application deployed on Render.com (`https://igot-karmayogi-zs8h.onrender.com`).
+  - Database (`backend/db.py`): Supabase PostgreSQL database using psycopg2 (`DATABASE_URL` environment variable required).
+  - AI & RAG Engine: Azure OpenAI (`gpt-5-mini`, `text-embedding-3-small`) for dynamic quiz generation, gap analysis, roadmap creation, and the Sahitya chat assistant; Pinecone vector database + SUPADATA/YouTube transcript ingestion for transcript-grounded quizzes.
+  - Multilingual Translation System (`dummy-igot/i18n.js` & `backend/main.py` `/api/translate`): Comprehensive dynamic translation across 10 Indian languages (English, Hindi, Bengali, Telugu, Tamil, Marathi, Gujarati, Kannada, Malayalam, Punjabi) with Google GTX primary + MyMemory fallback, caching in sessionStorage, and automated DOM MutationObserver translation that excludes code editors (`#monaco-editor-container`, `.monaco-editor`) and preserves quiz input indices/names.
+  - Recent Key Changes:
+    1. Replaced local port fallbacks (`localhost:8001`) with live Render backend URL across `common.js`, `register.html`, `login.html`, `assessment.html`, and `index.html`.
+    2. Integrated dynamic translation hooks on quiz modals, assessment views, and lab instructions.
+    3. Migrated database layer from SQLite to PostgreSQL (Supabase).
+  - Instructions for Testing Agent:
+    1. Server Setup: Serve `dummy-igot/` over an HTTP server (e.g., `python -m http.server 3000`) and access `http://localhost:3000`. Do not expect the local backend to run without `DATABASE_URL` configured in `backend/.env`; all pages communicate directly with `https://igot-karmayogi-zs8h.onrender.com`.
+    2. Authentication Flow: Navigate to `register.html`, register a test user or trigger demo reset, then log in via `login.html`. Verify JWT token storage in `localStorage`.
+    3. Assessment & Roadmap: Complete `assessment.html` (domain/subdomain quiz). Verify competency score calculation and generation of the TPAC personalized learning roadmap.
+    4. Course Player & AI Quiz: Open `course_player.html` for enrolled courses. Test video playback, trigger lesson quizzes and module quizzes. Verify Azure OpenAI quiz generation, radio button option selection, and scoring accuracy.
+    5. Hands-On Lab: Open `lab.html`. Verify Monaco editor loads, Pyodide executes Python code in-browser, and validation test cases pass/fail correctly.
+    6. Multilingual Verification: Use the language selector in the header to switch between Hindi, Tamil, Telugu, etc. Confirm that dynamic AI-generated quiz questions, modal popups, and UI labels translate while code in the Monaco editor remains in English and radio values stay intact.
+
+## Preferences
+[2026-09-07] - Prefer targeting the live deployed backend (`https://igot-karmayogi-zs8h.onrender.com`) for testing and frontend operations to avoid local database schema discrepancies.
+[2026-09-07] - Preserve functional DOM attributes during dynamic localization: never modify `<input type="radio">` values or names during translation so grading logic remains intact.
+[2026-09-07] - Exclude technical environments from automated translation: ensure Monaco Editor containers, `<pre>`, `<code>`, and script elements are never touched by DOM translation walks.
+[2026-09-07] - Maintain clean git hygiene: never push breaking changes or branch divergences; coordinate with teammate pushes via fetch/rebase.
