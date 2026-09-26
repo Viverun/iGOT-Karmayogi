@@ -138,4 +138,4 @@ course silently playing another department's lecture.
 ### Production caveat (intentional for the demo)
 Render's free tier has an **ephemeral disk** — `igot.db` (SQLite) resets on redeploy/restart, so
 demo user/assessment data lives only between restarts. For a persistent demo, attach a Render Disk
-at `/opt/render/project/src/backend` or point `DB_PATH` at Postgres later.
+at `/opt/render/project/src/backend` or point `DB_PATH` at Postgres later
