@@ -258,6 +258,8 @@ def login(body: AuthBody):
         raise HTTPException(401, "Invalid email or password")
     token = secrets.token_hex(16)
     conn.execute("INSERT INTO tokens (token, user_id) VALUES (?,?)", (token, row["id"]))
+    # every login opens a fresh Sahitya conversation; history only spans one session
+    conn.execute("DELETE FROM chat_messages WHERE user_id = ?", (row["id"],))
     conn.commit()
     has_history = conn.execute(
         "SELECT 1 FROM assessment_results WHERE user_id = ?", (row["id"],)).fetchone() is not None
@@ -284,7 +286,7 @@ def reset_demo(body: ResetDemoBody):
         uid = row["id"]
         for table in ("tokens", "learning_events", "chapter_progress", "lesson_quizzes",
                       "personalized_quizzes", "assessment_results", "user_competency",
-                      "enrollments", "roadmaps", "coding_labs"):
+                      "enrollments", "roadmaps", "coding_labs", "chat_messages", "course_swaps"):
             conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (uid,))
         conn.commit()
     conn.close()

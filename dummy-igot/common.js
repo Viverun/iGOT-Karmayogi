@@ -167,10 +167,10 @@ function fmtMins(m) { return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${
 
 /* ---- Learner chatbot widget: floating button + panel, shared across every
    learner page. Answers questions and can swap a too-hard roadmap course for
-   its foundational alternative via POST /api/chat. Admin persona never sees it. */
+   its foundational alternative via POST /api/chat. Admin and read-only personas never see it. */
 function renderChatWidget() {
   if (document.getElementById("chatWidgetRoot")) return;
-  if (!getToken() || isAdminUser()) return;
+  if (!getToken() || isAdminUser() || getUser()?.role === "readonly") return;
 
   const root = document.createElement("div");
   root.id = "chatWidgetRoot";
