@@ -255,7 +255,9 @@ function renderChatWidget() {
       }
     } catch (e) {
       document.getElementById("chatTyping")?.remove();
-      bubble("assistant", "Sorry, I couldn't reach Sahitya's service just now. Please try again in a moment.");
+      const reached = e.message && !/Failed to fetch|NetworkError|Load failed/i.test(e.message);
+      bubble("assistant", reached ? `Sorry, I couldn't answer that: ${e.message}`
+        : "Sorry, I couldn't reach Sahitya's service just now. Please try again in a moment.");
     }
   }
 

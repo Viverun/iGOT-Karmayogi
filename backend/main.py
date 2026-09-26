@@ -1726,10 +1726,16 @@ RULES:
   if any, or recommend they revisit the diagnostic assessment.
 - If they ask to go back to the original/harder version of something they previously swapped, set
   intent="revert_swap" and course_key to that course's key.
+- If the officer's message is a short confirmation ("yes", "go ahead", "do it", "sure") of a swap YOU offered
+  in the recent conversation, perform that swap: set intent="swap_course" and course_key to the course you
+  offered to replace. Do not ask for confirmation again.
 - Otherwise set intent="general" and just answer their question using the context above. Never invent
   scores, course names or TPAC programmes not present in the context.
 
 Return STRICT JSON only, no code fences: {{"reply": "...", "intent": "swap_course|revert_swap|general", "course_key": "<key or null>"}}
+
+RECENT CONVERSATION (oldest first; may be empty):
+{history}
 
 Officer's message: {message}
 """
@@ -1768,20 +1774,31 @@ class ChatBody(BaseModel):
 
 @app.post("/api/chat")
 def chat(body: ChatBody, authorization: Optional[str] = Header(None)):
-    user_id = require_writable_user(authorization)
-    context = _chat_context(user_id)
-
+    # read-only accounts may still ask questions; they just can't persist
+    # messages or swap roadmap courses (see the readonly guards below)
+    user_id = require_user(authorization)
     conn = get_db()
-    conn.execute("INSERT INTO chat_messages (user_id, role, content) VALUES (?,?,?)",
-                 (user_id, "user", body.message))
-    conn.commit()
+    role_row = conn.execute("SELECT role FROM users WHERE id=?", (user_id,)).fetchone()
+    readonly = bool(role_row and role_row["role"] == "readonly")
+    # last few turns, fetched before this message is stored, so follow-ups
+    # like "yes, go ahead" can resolve against what Sahitya just offered
+    recent = conn.execute(
+        "SELECT role, content FROM chat_messages WHERE user_id=? ORDER BY id DESC LIMIT 6",
+        (user_id,)).fetchall()
+    history = "\n".join(f"{'Officer' if r['role'] == 'user' else 'Sahitya'}: {privacy.redact_pii(r['content'])}"
+                        for r in reversed(recent)) or "(none)"
+    if not readonly:
+        conn.execute("INSERT INTO chat_messages (user_id, role, content) VALUES (?,?,?)",
+                     (user_id, "user", body.message))
+        conn.commit()
     conn.close()
+    context = _chat_context(user_id)
 
     reply, intent, course_key, mode = None, "general", None, "fallback"
     if llm.llm_available():
         try:
             safe_message = privacy.redact_pii(body.message)
-            raw = llm.generate(CHAT_SYSTEM_PROMPT.format(context=context, message=safe_message), max_tokens=1500)
+            raw = llm.generate(CHAT_SYSTEM_PROMPT.format(context=context, history=history, message=safe_message), max_tokens=1500)
             raw = raw.strip()
             if raw.startswith("```"):
                 raw = raw.split("```")[1]
@@ -1797,7 +1814,11 @@ def chat(body: ChatBody, authorization: Optional[str] = Header(None)):
             print("chat generation failed:", e)
 
     action = None
-    if intent == "swap_course" and course_key:
+    if readonly and intent in ("swap_course", "revert_swap"):
+        reply = ("This is a read-only demo account, so I can't change your roadmap. "
+                 "Log in with a regular account to swap courses.")
+        intent = "general"
+    elif intent == "swap_course" and course_key:
         try:
             replacement = ge.swap_roadmap_course(user_id, course_key, reason=body.message)
             action = {"type": "swap_course", "original_key": course_key, "replacement_key": replacement["key"],
@@ -1826,11 +1847,12 @@ def chat(body: ChatBody, authorization: Optional[str] = Header(None)):
             reply = ("I'm Sahitya — I can help with your competency gaps, roadmap, and TPAC recommendations. "
                      "Ask me things like \"what should I study next\" or \"switch me to an easier version of X\".")
 
-    conn = get_db()
-    conn.execute("INSERT INTO chat_messages (user_id, role, content, action_json) VALUES (?,?,?,?)",
-                 (user_id, "assistant", reply, json.dumps(action) if action else None))
-    conn.commit()
-    conn.close()
+    if not readonly:
+        conn = get_db()
+        conn.execute("INSERT INTO chat_messages (user_id, role, content, action_json) VALUES (?,?,?,?)",
+                     (user_id, "assistant", reply, json.dumps(action) if action else None))
+        conn.commit()
+        conn.close()
     return {"reply": reply, "intent": intent, "action": action, "mode": mode}
 
 
