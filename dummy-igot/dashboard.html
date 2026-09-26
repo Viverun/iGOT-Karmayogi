@@ -175,6 +175,8 @@ if (requireAuth() && !redirectIfAdmin()) {
 
     // radar
     const labels = d.competency_vector.map(v => v.area);
+    // load() re-runs after a chatbot swap — drop the previous chart before redrawing
+    Chart.getChart("radar")?.destroy();
     new Chart(document.getElementById("radar"), {
       type: "radar",
       data: {
