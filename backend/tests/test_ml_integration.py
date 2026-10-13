@@ -223,6 +223,10 @@ def t_single_vs_bulk_consistency():
         s = {v["area"]: (v["current"], v.get("source")) for v in single}
         b = {v["area"]: (v["current"], v.get("source")) for v in bulk}
         assert s == b, f"dashboard/admin disagree: {[a for a in s if s[a] != b.get(a)][:3]}"
+    except KeyError as e:
+        if str(e).strip("'\"") == "DATABASE_URL":
+            return "skip"
+        raise
     except Exception as e:
         if "connect" in str(type(e)).lower() or "connection" in str(e).lower():
             return "skip"
