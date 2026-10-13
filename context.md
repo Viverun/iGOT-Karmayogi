@@ -40,7 +40,7 @@ Full research/architecture: `docs/plan-of-action.md` and
    "Explore on my own" opt-out).
 2. **Tech decisions** — FastAPI backend (Python), static Tailwind frontend (no build
    step), SQLite for demo storage (pgvector-style embeddings moved to Pinecone),
-   provider-agnostic LLM adapter (Azure OpenAI `gpt-5-mini` + `text-embedding-3-small`),
+   provider-agnostic LLM adapter (Azure OpenAI `gpt-6-luna` + `text-embedding-3-small`),
    Pinecone vector DB, Sunbird-shaped mock catalogue with 14 real iGOT courses.
 3. **Read the SETU-STAT solution blueprint** (docs PDF) and aligned the build to it
    (three pillars: Diagnose / Prescribe / Assess).
@@ -80,14 +80,14 @@ Full research/architecture: `docs/plan-of-action.md` and
 7. **LLM + vector layer wired**:
    - `backend/.env` (gitignored) holds keys: `OPENAI_API_KEY`,
      `OPENAI_BASE_URL=https://khanjamilahmed202-3046-resource.openai.azure.com/openai/v1`,
-     `LLM_MODEL=gpt-5-mini`, `EMBEDDING_MODEL=text-embedding-3-small`,
+     `LLM_MODEL=gpt-6-luna`, `EMBEDDING_MODEL=text-embedding-3-small`,
      `PINECONE_API_KEY`, `PINECONE_INDEX=setu-stat`, `TRANSCRIPT_PROXY`,
      `SUPADATA_API_KEY`. Loaded by `env_config.py` (setdefault → real env wins).
    - **Pinecone** serverless index `setu-stat` (aws us-east-1), namespaces:
      `courses` (catalogue embedded at startup), `materials` (uploaded docs),
      `transcripts` (lecture transcripts, indexed at fetch time).
    - Personalized MCQ generation: user's weakest areas → embedded query → top
-     transcript/material chunks → gpt-5-mini with a strict "only from context" prompt.
+     transcript/material chunks → gpt-6-luna with a strict "only from context" prompt.
 8. **Frontend app pages** (all share `common.js`: API resolver, auth guard, header,
    footer): `dashboard.html` (readiness ring, radar, gap bars, roadmap,
    continue-learning, catalogue), `learn.html` (iGOT-course chapter flow),
@@ -105,7 +105,7 @@ Full research/architecture: `docs/plan-of-action.md` and
     module quiz passed. Failed quizzes get a **🔄 Retry** button (same stored
     questions, unlimited attempts).
 11. **Transcript-grounded quizzes**: module (5 Qs) and lesson (5 Qs) quizzes generated
-    by gpt-5-mini strictly from the lecture transcripts (fetched via
+    by gpt-6-luna strictly from the lecture transcripts (fetched via
     `youtube-transcript-api`, cached in SQLite, **indexed into Pinecone at fetch
     time** with an `indexed` flag). Quiz generation retrieves semantically from
     Pinecone — no re-fetching, ever. Stored per user for fair retakes; fallback
@@ -118,7 +118,7 @@ Full research/architecture: `docs/plan-of-action.md` and
     memory's weak areas + recommended course, (2) course-scoped assessment — pick a
     roadmap course + 5/10/15/25/30 questions, (3) upload PDF/TXT → Pinecone-indexed →
     MCQs weighted toward weak areas. All AI/tooling mentions removed from the UI
-    (no "gpt-5-mini/transcript/Pinecone" text shown to users).
+    (no "gpt-6-luna/transcript/Pinecone" text shown to users).
 14. **Deployment**: frontend on **Vercel**, backend on **Render** (Blueprint-style,
     `render.yaml` + `requirements.txt`), **GitHub Actions CI/CD** (`.github/workflows/ci.yml`):
     backend CI (install, import check, boot + smoke test), frontend CI (API-wiring and
@@ -200,7 +200,7 @@ backend/
   transcripts.py     YT transcript fetch (direct → TRANSCRIPT_PROXY → Supadata),
                      SQLite cache, fetch-time Pinecone indexing
   materials.py       PDF/TXT extraction, chunking, MCQ generation (LLM or fallback)
-  llm.py             Azure OpenAI adapter (gpt-5-mini reasoning-safe), prompts, JSON parsing
+  llm.py             Azure OpenAI adapter (gpt-6-luna reasoning-safe), prompts, JSON parsing
   vector_store.py    Pinecone (namespaces: courses, materials, transcripts)
   vector index of course catalogue at startup
   env_config.py      Loads backend/.env (setdefault; real env wins)

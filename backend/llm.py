@@ -3,12 +3,13 @@
 Configured via backend/.env (loaded by env_config):
   ANTHROPIC_API_KEY  (Claude)
   OPENAI_API_KEY     (OpenAI or Azure OpenAI v1 endpoint via OPENAI_BASE_URL)
-  LLM_MODEL          (default gpt-5-mini; reasoning models use max_completion_tokens)
+  LLM_MODEL          (default gpt-6-luna; reasoning models use max_completion_tokens)
 
 Without a key everything still works via the deterministic fallback generator.
 """
 import json
 import os
+import re
 
 import httpx
 
@@ -44,8 +45,8 @@ def _call_openai(prompt: str, max_tokens: int = 4000) -> str:
     key, base = get_openai_auth()
     model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
     body = {"model": model, "messages": [{"role": "user", "content": prompt}]}
-    # gpt-5* reasoning models reject max_tokens/temperature — use max_completion_tokens
-    if model.startswith("gpt-5") or model.startswith("o"):
+    # gpt-5+ (incl. gpt-6-luna) and o* reasoning models reject max_tokens/temperature — use max_completion_tokens
+    if re.match(r"gpt-([5-9]|\d{2,})", model) or model.startswith("o"):
         body["max_completion_tokens"] = max_tokens
     else:
         body["max_tokens"] = max_tokens

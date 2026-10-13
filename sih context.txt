@@ -15,7 +15,7 @@
   - Frontend (`dummy-igot/`): Static Single-Page Application using HTML5, Tailwind CSS, Lucide icons, Monaco Code Editor, and in-browser Pyodide Python execution runtime. All pages point to the production backend `https://igot-karmayogi-zs8h.onrender.com`.
   - Backend (`backend/`): FastAPI application deployed on Render.com (`https://igot-karmayogi-zs8h.onrender.com`).
   - Database (`backend/db.py`): Supabase PostgreSQL database using psycopg2 (`DATABASE_URL` environment variable required).
-  - AI & RAG Engine: Azure OpenAI (`gpt-5-mini`, `text-embedding-3-small`) for dynamic quiz generation, gap analysis, roadmap creation, and the Sahitya chat assistant; Pinecone vector database + SUPADATA/YouTube transcript ingestion for transcript-grounded quizzes.
+  - AI & RAG Engine: Azure OpenAI (`gpt-6-luna`, `text-embedding-3-small`) for dynamic quiz generation, gap analysis, roadmap creation, and the Sahitya chat assistant; Pinecone vector database + SUPADATA/YouTube transcript ingestion for transcript-grounded quizzes.
   - Multilingual Translation System (`dummy-igot/i18n.js` & `backend/main.py` `/api/translate`): Comprehensive dynamic translation across 10 Indian languages (English, Hindi, Bengali, Telugu, Tamil, Marathi, Gujarati, Kannada, Malayalam, Punjabi) with Google GTX primary + MyMemory fallback, caching in sessionStorage, and automated DOM MutationObserver translation that excludes code editors (`#monaco-editor-container`, `.monaco-editor`) and preserves quiz input indices/names.
   - Recent Key Changes:
     1. Replaced local port fallbacks (`localhost:8001`) with live Render backend URL across `common.js`, `register.html`, `login.html`, `assessment.html`, and `index.html`.
