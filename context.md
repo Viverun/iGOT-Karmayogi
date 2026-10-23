@@ -1,7 +1,7 @@
 # SIH 26101 — SETU-STAT: Project Context & Work Log
 
 **Repo:** github.com/Viverun/iGOT-Karmayogi (branch `main`)
-**Live:** https://igot-karmayogi.vercel.app (frontend) · https://igot-karmayogi-zs8h.onrender.com (backend)
+**Live:** https://igot-karmayogi.vercel.app (frontend) · https://igot-karmayogi-j3i0.onrender.com (backend)
 **Period covered:** Sep 5 (yesterday) – Sep 6 (today)
 **Purpose:** context handoff — everything built, decided, fixed, and why.
 
