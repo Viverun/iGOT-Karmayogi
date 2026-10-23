@@ -627,7 +627,7 @@ async function translateDynamicTexts(texts, lang) {
     let handled = false;
     // 1. Try backend /api/translate first
     try {
-      const apiBase = window.IGOT_API_BASE || (["localhost", "127.0.0.1"].includes(location.hostname) ? "http://localhost:8001" : "https://igot-karmayogi-j3i0.onrender.com");
+      const apiBase = window.IGOT_API_BASE || (["localhost", "127.0.0.1"].includes(location.hostname) ? "http://localhost:8001" : "https://igot-karmayogi-1.onrender.com");
       const resp = await fetch(apiBase + "/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

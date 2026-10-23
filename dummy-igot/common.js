@@ -8,7 +8,7 @@ if (typeof document !== "undefined" && !document.querySelector('script[src*="i18
 window.IGOT_API_BASE = window.IGOT_API_BASE ||
   (["localhost", "127.0.0.1"].includes(location.hostname)
     ? "http://127.0.0.1:8001"
-    : "https://igot-karmayogi-j3i0.onrender.com");
+    : "https://igot-karmayogi-1.onrender.com");
 const API = window.IGOT_API_BASE;
 
 function getToken() { return localStorage.getItem("igot_token"); }

@@ -12,6 +12,6 @@ jobs:
       - name: Ping health endpoint
         run: |
           HTTP=$(curl -s -o /tmp/health.json -w "%{http_code}" -m 90 \
-            https://igot-karmayogi-j3i0.onrender.com/api/health)
+            https://igot-karmayogi-1.onrender.com/api/health)
           echo "HTTP $HTTP — $(cat /tmp/health.json)"
           test "$HTTP" = "200"
